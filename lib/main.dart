@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:todo_spring_2025/home/home_screen.dart';
+import 'package:todo_spring_2025/router/router_screen.dart';
 import 'firebase_options.dart';
+import 'login/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,14 +24,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('TODO Spring 2025'),
-        ),
-        body: Center(
-          child: Text('Hello, World!'),
-        ),
-      ),
+      home: RouterScreen(),
     );
   }
 }
