@@ -10,7 +10,7 @@ class Todo {
   final GeoPoint? location;
   final String category;
   final List<Subtask> subtasks;
-
+  final int priority;
 
   Todo({
     required this.id,
@@ -22,6 +22,7 @@ class Todo {
     required this.location,
     required this.category,
     required this.subtasks,
+    required this.priority,
   });
 
   Map<String, dynamic> toSnapshot() {
@@ -34,6 +35,7 @@ class Todo {
       'location': location,
       'category': category,
       'subtasks': subtasks.map((subtask) => subtask.toSnapshot()).toList(),
+      'priority': priority,
     };
   }
 
@@ -51,6 +53,7 @@ class Todo {
       subtasks: (data['subtasks'] as List<dynamic>? ?? [])
           .map((subtaskData) => Subtask.fromSnapshot(subtaskData as Map<String, dynamic>))
           .toList(),
+      priority: data['priority'] ?? 0,
     );
   }
 }

@@ -20,6 +20,7 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   late TextEditingController _textController;
+  late int _priority;
   DateTime? _selectedDueDate;
 
   @override
@@ -27,6 +28,25 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     _textController = TextEditingController(text: widget.todo.text);
     _selectedDueDate = widget.todo.dueAt;
+    _priority = widget.todo.priority;
+  }
+
+  Future<void> _updatePriority(int newPriority) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .update({'priority': newPriority});
+      setState(() {
+        _priority = newPriority; // Update local state
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update priority: $e')),
+        );
+      }
+    }
   }
 
   Future<List<String>> fetchCategories() async {
@@ -458,6 +478,98 @@ class _DetailScreenState extends State<DetailScreen> {
                                 onPressed: () async {
                                   if (selectedCategory != null) {
                                     await _updateCategory(selectedCategory!);
+                                    Navigator.pop(context);
+                                  }
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            ListTile(
+              title: const Text('Priority'),
+              subtitle: Row(
+                children: [
+                  Icon(
+                    Icons.circle,
+                    color: _priority == 0
+                        ? Colors.green
+                        : _priority == 1
+                        ? Colors.orange
+                        : Colors.red,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _priority == 0
+                        ? 'Low'
+                        : _priority == 1
+                        ? 'Medium'
+                        : 'High',
+                  ),
+                ],
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () async {
+                  int? selectedPriority = _priority;
+                  await showDialog(
+                    context: context,
+                    builder: (context) {
+                      return StatefulBuilder(
+                        builder: (context, setState) {
+                          return AlertDialog(
+                            title: const Text('Edit Priority'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                RadioListTile<int>(
+                                  value: 0,
+                                  groupValue: selectedPriority,
+                                  title: const Text('Low'),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedPriority = value;
+                                    });
+                                  },
+                                ),
+                                RadioListTile<int>(
+                                  value: 1,
+                                  groupValue: selectedPriority,
+                                  title: const Text('Medium'),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedPriority = value;
+                                    });
+                                  },
+                                ),
+                                RadioListTile<int>(
+                                  value: 2,
+                                  groupValue: selectedPriority,
+                                  title: const Text('High'),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedPriority = value;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  if (selectedPriority != null) {
+                                    await _updatePriority(selectedPriority!);
                                     Navigator.pop(context);
                                   }
                                 },
