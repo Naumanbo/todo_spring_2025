@@ -4,7 +4,9 @@ import 'package:todo_spring_2025/home/home_screen.dart';
 import 'package:todo_spring_2025/login/login_screen.dart';
 
 class RouterScreen extends StatelessWidget {
-  const RouterScreen({super.key});
+  final Function(int) onThemeChanged;
+
+  const RouterScreen({super.key, required this.onThemeChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +14,7 @@ class RouterScreen extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.data != null) {
-          return const HomeScreen();
+          return HomeScreen(onThemeChanged: onThemeChanged);
         } else {
           return const LoginScreen();
         }

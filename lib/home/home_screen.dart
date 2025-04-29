@@ -9,13 +9,24 @@ import 'details/detail_screen.dart';
 import 'filter/filter_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Function(int) onThemeChanged;
+
+  const HomeScreen({super.key, required this.onThemeChanged});
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final List<String> _themeOptions = [
+    'Light Theme',
+    'Dark Theme',
+    'Gradient Theme 1',
+    'Gradient Theme 2',
+    'Gradient Theme 3',
+  ];
+
+  int _selectedThemeIndex = 0;
   final _controller = TextEditingController();
   final _searchController = TextEditingController();
   StreamSubscription<List<Todo>>? _todoSubscription;
@@ -82,6 +93,29 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Home'),
         actions: [
+          DropdownButton<int>(
+            value: _selectedThemeIndex,
+            icon: const Icon(Icons.color_lens, color: Colors.white),
+            dropdownColor: Colors.grey[800],
+            items: List.generate(
+              _themeOptions.length,
+                  (index) => DropdownMenuItem(
+                value: index,
+                child: Text(
+                  _themeOptions[index],
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+            onChanged: (int? newIndex) {
+              if (newIndex != null) {
+                setState(() {
+                  _selectedThemeIndex = newIndex;
+                });
+                widget.onThemeChanged(newIndex);
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
