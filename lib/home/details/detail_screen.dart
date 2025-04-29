@@ -7,6 +7,8 @@ import '../../data/todo.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
+const List<String> defaultCategories = ['None', 'Home', 'Work', 'School'];
+
 class DetailScreen extends StatefulWidget {
   final Todo todo;
 
@@ -27,9 +29,57 @@ class _DetailScreenState extends State<DetailScreen> {
     _selectedDueDate = widget.todo.dueAt;
   }
 
+  Future<List<String>> fetchCategories() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('categories').get();
+    final customCategories =
+        snapshot.docs.map((doc) => doc['name'] as String).toList();
+    return [...defaultCategories, ...customCategories];
+  }
+
+  Future<void> addCategory(String categoryName) async {
+    await FirebaseFirestore.instance
+        .collection('categories')
+        .add({'name': categoryName});
+  }
+
+  Future<void> deleteCategory(String categoryName) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('categories')
+        .where('name', isEqualTo: categoryName)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  Future<void> _removeCategory(String categoryName) async {
+    await deleteCategory(categoryName);
+
+    // Update all todos using the removed category to "None"
+    final todosSnapshot = await FirebaseFirestore.instance
+        .collection('todos')
+        .where('category', isEqualTo: categoryName)
+        .get();
+
+    for (final doc in todosSnapshot.docs) {
+      await doc.reference.update({'category': 'None'});
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Category "$categoryName" removed!')),
+      );
+    }
+  }
+
   Future<void> _delete() async {
     try {
-      await FirebaseFirestore.instance.collection('todos').doc(widget.todo.id).delete();
+      await FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .delete();
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -47,7 +97,10 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Future<void> _updateText(String newText) async {
     try {
-      await FirebaseFirestore.instance.collection('todos').doc(widget.todo.id).update({'text': newText});
+      await FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .update({'text': newText});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Todo updated!')),
@@ -67,7 +120,24 @@ class _DetailScreenState extends State<DetailScreen> {
       await FirebaseFirestore.instance
           .collection('todos')
           .doc(widget.todo.id)
-          .update({'dueAt': newDueDate == null ? null : Timestamp.fromDate(newDueDate)});
+          .update({
+        'dueAt': newDueDate == null ? null : Timestamp.fromDate(newDueDate)
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update todo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateCategory(String newCategory) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .update({'category': newCategory});
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -79,7 +149,8 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Future<bool> _requestNotificationPermission() async {
     final isGranted = await flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
             ?.requestNotificationsPermission() ??
         false;
     return isGranted;
@@ -90,7 +161,10 @@ class _DetailScreenState extends State<DetailScreen> {
       SnackBar(
         content: Text(
           'You need to enable notifications to set due date.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: Colors.white),
         ),
         backgroundColor: Colors.redAccent,
         duration: Duration(seconds: 10),
@@ -108,8 +182,10 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _initializeNotifications() async {
-    final initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    final InitializationSettings initializationSettings = InitializationSettings(
+    final initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    final InitializationSettings initializationSettings =
+        InitializationSettings(
       android: initializationSettingsAndroid,
     );
     await flutterLocalNotificationsPlugin.initialize(
@@ -158,7 +234,8 @@ class _DetailScreenState extends State<DetailScreen> {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Delete Todo'),
-                  content: const Text('Are you sure you want to delete this todo?'),
+                  content:
+                      const Text('Are you sure you want to delete this todo?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -197,7 +274,9 @@ class _DetailScreenState extends State<DetailScreen> {
             const SizedBox(height: 16),
             ListTile(
               title: const Text('Due Date'),
-              subtitle: Text(_selectedDueDate?.toLocal().toString().split('.')[0] ?? 'No due date'),
+              subtitle: Text(
+                  _selectedDueDate?.toLocal().toString().split('.')[0] ??
+                      'No due date'),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -236,8 +315,9 @@ class _DetailScreenState extends State<DetailScreen> {
 
                       final selectedTime = await showTimePicker(
                         context: context,
-                        initialTime:
-                            _selectedDueDate != null ? TimeOfDay.fromDateTime(_selectedDueDate!) : TimeOfDay.now(),
+                        initialTime: _selectedDueDate != null
+                            ? TimeOfDay.fromDateTime(_selectedDueDate!)
+                            : TimeOfDay.now(),
                       );
                       if (selectedTime == null) return;
 
@@ -264,9 +344,138 @@ class _DetailScreenState extends State<DetailScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: const Text('Category'),
+              subtitle: Text(widget.todo.category),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () async {
+                  final categories = await fetchCategories();
+                  String? selectedCategory = widget.todo.category;
+                  await showDialog(
+                    context: context,
+                    builder: (context) {
+                      return StatefulBuilder(
+                        builder: (context, setState) {
+                          final TextEditingController _newCategoryController = TextEditingController();
+                          return AlertDialog(
+                            title: const Text('Edit Category'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButton<String>(
+                                        value: selectedCategory,
+                                        isExpanded: true,
+                                        items: categories.map((category) {
+                                          return DropdownMenuItem(
+                                            value: category,
+                                            child: Text(category),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            selectedCategory = value;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    if (selectedCategory != null &&
+                                        !defaultCategories.contains(selectedCategory))
+                                      IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Delete Category'),
+                                              content: Text(
+                                                  'Are you sure you want to delete "$selectedCategory"?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(context, false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(context, true),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true && selectedCategory != null) {
+                                            await _removeCategory(selectedCategory!);
+                                            setState(() {
+                                              categories.remove(selectedCategory);
+                                              selectedCategory = categories.isNotEmpty
+                                                  ? categories.first
+                                                  : null;
+                                            });
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _newCategoryController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'New Custom Category',
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add),
+                                      onPressed: () async {
+                                        final newCat = _newCategoryController.text.trim();
+                                        if (newCat.isNotEmpty && !categories.contains(newCat)) {
+                                          await addCategory(newCat);
+                                          setState(() {
+                                            categories.add(newCat);
+                                            selectedCategory = newCat;
+                                            _newCategoryController.clear();
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  if (selectedCategory != null) {
+                                    await _updateCategory(selectedCategory!);
+                                    Navigator.pop(context);
+                                  }
+                                },
+                                child: const Text('Save'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
