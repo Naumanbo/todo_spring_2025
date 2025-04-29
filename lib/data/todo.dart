@@ -7,6 +7,10 @@ class Todo {
   final DateTime createdAt;
   final DateTime? completedAt;
   final DateTime? dueAt;
+  final GeoPoint? location;
+  final String category;
+  final List<Subtask> subtasks;
+
 
   Todo({
     required this.id,
@@ -15,6 +19,9 @@ class Todo {
     required this.createdAt,
     required this.completedAt,
     required this.dueAt,
+    required this.location,
+    required this.category,
+    required this.subtasks,
   });
 
   Map<String, dynamic> toSnapshot() {
@@ -24,6 +31,9 @@ class Todo {
       'createdAt': Timestamp.fromDate(createdAt),
       'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
       'dueAt': dueAt != null ? Timestamp.fromDate(dueAt!) : null,
+      'location': location,
+      'category': category,
+      'subtasks': subtasks.map((subtask) => subtask.toSnapshot()).toList(),
     };
   }
 
@@ -36,6 +46,35 @@ class Todo {
       createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
       completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
       dueAt: data['dueAt'] != null ? (data['dueAt'] as Timestamp).toDate() : null,
+      location: data['location'] != null ? data['location'] as GeoPoint : null,
+      category: data['category'] ?? 'None',
+      subtasks: (data['subtasks'] as List<dynamic>? ?? [])
+          .map((subtaskData) => Subtask.fromSnapshot(subtaskData as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class Subtask {
+  final String text;
+  final DateTime? completedAt;
+
+  Subtask({
+    required this.text,
+    required this.completedAt,
+  });
+
+  Map<String, dynamic> toSnapshot() {
+    return {
+      'text': text,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+    };
+  }
+
+  factory Subtask.fromSnapshot(Map<String, dynamic> data) {
+    return Subtask(
+      text: data['text'],
+      completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
     );
   }
 }
