@@ -613,10 +613,35 @@ class _HomeScreenState extends State<HomeScreen> {
                           return ListTile(
                             leading: Checkbox(
                               value: todo.completedAt != null,
-                              onChanged: (value) {
-                                FirebaseFirestore.instance.collection('todos').doc(todo.id).update({
-                                  'completedAt': value == true ? FieldValue.serverTimestamp() : null,
-                                });
+                              onChanged: (value) async {
+                                final timestamp = value == true ? Timestamp.now() : null;
+                                final todoRef = FirebaseFirestore.instance.collection('todos').doc(todo.id);
+                                
+                                // Get current subtasks
+                                final doc = await todoRef.get();
+                                if (doc.exists) {
+                                  final data = doc.data();
+                                  if (data != null && data['subtasks'] != null) {
+                                    final List<dynamic> subtasks = data['subtasks'];
+                                    // Update all subtasks completion status
+                                    final updatedSubtasks = subtasks.map((s) {
+                                      final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                      subtask['completedAt'] = value == true ? Timestamp.now() : null;
+                                      return subtask;
+                                    }).toList();
+                                    
+                                    // Update both the main task and all subtasks
+                                    await todoRef.update({
+                                      'completedAt': timestamp,
+                                      'subtasks': updatedSubtasks,
+                                    });
+                                  } else {
+                                    // If no subtasks, just update the main task
+                                    await todoRef.update({
+                                      'completedAt': timestamp,
+                                    });
+                                  }
+                                }
                               },
                             ),
                             title: Text(
