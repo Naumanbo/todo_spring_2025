@@ -96,27 +96,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         itemBuilder: (context, index) {
                           final todo = todos[index];
                           return Card(
-                            margin: const EdgeInsets.all(4),
-                            child: ListTile(
-                              title: Text(
-                                todo.text,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  decoration: todo.completedAt != null
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DetailScreen(todo: todo),
+                            margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    todo.text,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      decoration: todo.completedAt != null
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
                                   ),
-                                );
-                              },
+                                  if (todo.dueAt != null)
+                                    Text(
+                                      todo.dueAt!.hour.toString().padLeft(2, '0') + 
+                                      ':' + 
+                                      todo.dueAt!.minute.toString().padLeft(2, '0'),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           );
                         },
