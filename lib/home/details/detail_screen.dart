@@ -419,6 +419,17 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _showAddSubtaskDialog(List<Subtask> currentSubtasks) async {
+    if (currentSubtasks.length >= 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot add more than 10 subtasks to a task.'),
+          backgroundColor: Colors.black,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
     final TextEditingController controller = TextEditingController();
     
     return showModalBottomSheet<void>(
