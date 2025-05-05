@@ -484,10 +484,16 @@ class _DetailScreenState extends State<DetailScreen> {
                           final updatedSubtasks = List<Subtask>.from(currentSubtasks)
                             ..add(Subtask(text: controller.text.trim(), completedAt: null));
                           
+                          // Check if all subtasks (including the new one) are completed
+                          final allSubtasksCompleted = updatedSubtasks.every((s) => s.completedAt != null);
+                          
                           await FirebaseFirestore.instance
                               .collection('todos')
                               .doc(widget.todo.id)
-                              .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+                              .update({
+                                'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList(),
+                                'completedAt': allSubtasksCompleted ? Timestamp.now() : null,
+                              });
                         }
                         Navigator.pop(context);
                       },
