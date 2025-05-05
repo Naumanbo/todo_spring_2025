@@ -215,9 +215,22 @@ class _HomeScreenState extends State<HomeScreen> {
       minChildSize: 0.4,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final themeColor = isDark 
+            ? Theme.of(context).colorScheme.surface 
+            : _selectedThemeIndex == 0 
+                ? Colors.white
+                : _selectedThemeIndex == 1 
+                    ? Colors.grey[850]
+                    : _selectedThemeIndex == 2 
+                        ? Colors.blue[100]
+                        : _selectedThemeIndex == 3 
+                            ? Colors.orange[100]
+                            : Colors.green[100];
+
         return Container(
           decoration: BoxDecoration(
-            color: Colors.green[100],
+            color: themeColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Padding(
@@ -541,6 +554,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: _selectedThemeIndex == 0 
+            ? Colors.white 
+            : _selectedThemeIndex == 1 
+                ? Theme.of(context).colorScheme.surface
+                : _selectedThemeIndex == 2 
+                    ? Colors.blue[100]
+                    : _selectedThemeIndex == 3 
+                        ? Colors.orange[100]
+                        : Colors.green[100],
         title: const Text('Home'),
         actions: [
           DropdownButton<int>(

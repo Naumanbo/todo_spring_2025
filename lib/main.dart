@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:todo_spring_2025/router/router_screen.dart';
@@ -33,38 +34,63 @@ class _MyAppState extends State<MyApp> {
         seedColor: Colors.green,
         brightness: Brightness.light,
       ),
-      textTheme: GoogleFonts.sairaCondensedTextTheme(ThemeData.light().textTheme),
+      appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+        ),
+      ),
     ),
     ThemeData.dark(useMaterial3: true).copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: Colors.green,
         brightness: Brightness.dark,
       ),
-      textTheme: GoogleFonts.sairaCondensedTextTheme(ThemeData.dark().textTheme),
+      appBarTheme: const AppBarTheme(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+      ),
     ),
-    ThemeData.light().copyWith(
-      scaffoldBackgroundColor: Colors.blue[100],
+    ThemeData.light(useMaterial3: true).copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: Colors.blue,
         brightness: Brightness.light,
       ),
-      textTheme: GoogleFonts.sairaCondensedTextTheme(ThemeData.light().textTheme),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.blue[100],
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.blue[100],
+          statusBarIconBrightness: Brightness.dark,
+        ),
+      ),
     ),
-    ThemeData.light().copyWith(
-      scaffoldBackgroundColor: Colors.orange[100],
+    ThemeData.light(useMaterial3: true).copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.purple,
+        brightness: Brightness.light,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.purple[100],
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.purple[100],
+          statusBarIconBrightness: Brightness.dark,
+        ),
+      ),
+    ),
+    ThemeData.light(useMaterial3: true).copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: Colors.orange,
         brightness: Brightness.light,
       ),
-      textTheme: GoogleFonts.sairaCondensedTextTheme(ThemeData.light().textTheme),
-    ),
-    ThemeData.light().copyWith(
-      scaffoldBackgroundColor: Colors.green[100],
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.green,
-        brightness: Brightness.light,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.orange[100],
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.orange[100],
+          statusBarIconBrightness: Brightness.dark,
+        ),
       ),
-      textTheme: GoogleFonts.sairaCondensedTextTheme(ThemeData.light().textTheme),
     ),
   ];
 
@@ -73,14 +99,23 @@ class _MyAppState extends State<MyApp> {
     return ValueListenableBuilder<int>(
       valueListenable: _themeIndex,
       builder: (context, themeIndex, child) {
-        return MaterialApp(
-          title: 'TODO Spring 2025',
-          theme: _themes[themeIndex],
-          navigatorObservers: [routeObserver],
-          home: RouterScreen(
-            onThemeChanged: (index) {
-              _themeIndex.value = index;
-            },
+        final isDark = themeIndex == 1;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: isDark 
+              ? SystemUiOverlayStyle.light
+              : SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.dark,
+                ),
+          child: MaterialApp(
+            title: 'TODO Spring 2025',
+            theme: _themes[themeIndex],
+            navigatorObservers: [routeObserver],
+            home: RouterScreen(
+              onThemeChanged: (index) {
+                _themeIndex.value = index;
+              },
+            ),
           ),
         );
       },
