@@ -8,6 +8,7 @@ import 'details/detail_screen.dart';
 import 'details/location_picker_screen.dart';
 import 'filter/filter_sheet.dart';
 import 'calendar/calendar_screen.dart';
+import 'widgets/expandable_fab.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -20,7 +21,7 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final List<String> _themeOptions = ['Light Theme', 'Dark Theme', 'Gradient Theme 1', 'Gradient Theme 2', 'Gradient Theme 3'];
   int _selectedThemeIndex = 0;
   final _searchController = TextEditingController();
@@ -586,186 +587,177 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Search',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.filter_list),
-                    onPressed: () async {
-                      final result = await showModalBottomSheet<FilterSheetResult>(
-                        context: context,
-                        builder: (context) => FilterSheet(initialFilters: _filters),
-                      );
-                      if (result != null) {
-                        setState(() => _filters = result);
-                      }
-                    },
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Search',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.filter_list),
+                        onPressed: () async {
+                          final result = await showModalBottomSheet<FilterSheetResult>(
+                            context: context,
+                            builder: (context) => FilterSheet(initialFilters: _filters),
+                          );
+                          if (result != null) {
+                            setState(() => _filters = result);
+                          }
+                        },
+                      ),
+                    ),
+                    onChanged: (value) => setState(() => _searchText = value),
                   ),
                 ),
-                onChanged: (value) => setState(() => _searchText = value),
-              ),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('todos')
-                        .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
+                Expanded(
+                  child: Stack(
+                    children: [
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('todos')
+                            .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          }
 
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
 
-                      final todos = snapshot.data?.docs
-                          .map((doc) => Todo.fromSnapshot(doc))
-                          .toList() ?? [];
-                      final filteredTodos = filterAndSortTodos(todos);
+                          final todos = snapshot.data?.docs
+                              .map((doc) => Todo.fromSnapshot(doc))
+                              .toList() ?? [];
+                          final filteredTodos = filterAndSortTodos(todos);
 
-                      return ListView.builder(
-                        itemCount: filteredTodos.length,
-                        itemBuilder: (context, index) {
-                          final todo = filteredTodos[index];
-                          return ListTile(
-                            leading: Checkbox(
-                              value: todo.completedAt != null,
-                              onChanged: (value) async {
-                                final timestamp = value == true ? Timestamp.now() : null;
-                                final todoRef = FirebaseFirestore.instance.collection('todos').doc(todo.id);
-                                
-                                // Get current subtasks
-                                final doc = await todoRef.get();
-                                if (doc.exists) {
-                                  final data = doc.data();
-                                  if (data != null && data['subtasks'] != null) {
-                                    final List<dynamic> subtasks = data['subtasks'];
+                          return ListView.builder(
+                            itemCount: filteredTodos.length,
+                            itemBuilder: (context, index) {
+                              final todo = filteredTodos[index];
+                              return ListTile(
+                                leading: Checkbox(
+                                  value: todo.completedAt != null,
+                                  onChanged: (value) async {
+                                    final timestamp = value == true ? Timestamp.now() : null;
+                                    final todoRef = FirebaseFirestore.instance.collection('todos').doc(todo.id);
                                     
-                                    if (value == true) {
-                                      // When marking as complete, mark all subtasks as complete
-                                      final updatedSubtasks = subtasks.map((s) {
-                                        final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
-                                        subtask['completedAt'] = timestamp;
-                                        return subtask;
-                                      }).toList();
-                                      
-                                      await todoRef.update({
-                                        'completedAt': timestamp,
-                                        'subtasks': updatedSubtasks,
-                                      });
-                                    } else {
-                                      // When unchecking, uncheck all subtasks
-                                      final updatedSubtasks = subtasks.map((s) {
-                                        final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
-                                        subtask['completedAt'] = null;
-                                        return subtask;
-                                      }).toList();
-                                      
-                                      await todoRef.update({
-                                        'completedAt': null,
-                                        'subtasks': updatedSubtasks,
-                                      });
+                                    // Get current subtasks
+                                    final doc = await todoRef.get();
+                                    if (doc.exists) {
+                                      final data = doc.data();
+                                      if (data != null && data['subtasks'] != null) {
+                                        final List<dynamic> subtasks = data['subtasks'];
+                                        
+                                        if (value == true) {
+                                          // When marking as complete, mark all subtasks as complete
+                                          final updatedSubtasks = subtasks.map((s) {
+                                            final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                            subtask['completedAt'] = timestamp;
+                                            return subtask;
+                                          }).toList();
+                                          
+                                          await todoRef.update({
+                                            'completedAt': timestamp,
+                                            'subtasks': updatedSubtasks,
+                                          });
+                                        } else {
+                                          // When unchecking, uncheck all subtasks
+                                          final updatedSubtasks = subtasks.map((s) {
+                                            final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                            subtask['completedAt'] = null;
+                                            return subtask;
+                                          }).toList();
+                                          
+                                          await todoRef.update({
+                                            'completedAt': null,
+                                            'subtasks': updatedSubtasks,
+                                          });
+                                        }
+                                      } else {
+                                        // If no subtasks, just update the main task
+                                        await todoRef.update({
+                                          'completedAt': timestamp,
+                                        });
+                                      }
                                     }
-                                  } else {
-                                    // If no subtasks, just update the main task
-                                    await todoRef.update({
-                                      'completedAt': timestamp,
-                                    });
-                                  }
-                                }
-                              },
-                            ),
-                            title: Text(
-                              todo.text,
-                              style: todo.completedAt != null
-                                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                                  : null,
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(todo.category),
-                                Text(
-                                  todo.dueAt != null 
-                                      ? 'Due: ${todo.dueAt!.toLocal().toString().split('.')[0]}'
-                                      : 'Due: N/A',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
-                                  ),
+                                  },
                                 ),
-                              ],
-                            ),
-                            trailing: Icon(
-                              Icons.circle,
-                              color: todo.priority == 0
-                                  ? Colors.green
-                                  : todo.priority == 1
-                                      ? Colors.orange
-                                      : Colors.red,
-                              size: 12,
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DetailScreen(todo: todo),
+                                title: Text(
+                                  todo.text,
+                                  style: todo.completedAt != null
+                                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                      : null,
                                 ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(todo.category),
+                                    Text(
+                                      todo.dueAt != null 
+                                          ? 'Due: ${todo.dueAt!.toLocal().toString().split('.')[0]}'
+                                          : 'Due: N/A',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).textTheme.bodySmall?.color,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: Icon(
+                                  Icons.circle,
+                                  color: todo.priority == 0
+                                      ? Colors.green
+                                      : todo.priority == 1
+                                          ? Colors.orange
+                                          : Colors.red,
+                                  size: 12,
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DetailScreen(todo: todo),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           );
                         },
-                      );
-                    },
-                  ),
-                  if (_isAddingTask)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isAddingTask = false),
-                        child: Container(
-                          color: Colors.black.withOpacity(0.5),
-                          child: GestureDetector(
-                            onTap: () {}, // Prevent tap from propagating
+                      ),
+                      if (_isAddingTask)
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Container(
+                            key: const ValueKey<String>('taskForm'),
+                            color: Colors.black.withOpacity(0.5),
                             child: _buildTaskForm(),
                           ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            heroTag: "calendarBtn",
-            onPressed: () {
+          ),
+          ExpandableFab(
+            onCalendarPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const CalendarScreen()),
               );
             },
-            child: const Icon(Icons.calendar_month),
-          ),
-          const SizedBox(width: 16),
-          FloatingActionButton(
-            heroTag: "addBtn",
-            onPressed: () => setState(() => _isAddingTask = !_isAddingTask),
-            child: Icon(_isAddingTask ? Icons.close : Icons.add),
+            onTaskPressed: () {
+              setState(() => _isAddingTask = !_isAddingTask);
+            },
           ),
         ],
       ),
