@@ -29,39 +29,22 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedThemeIndex = 0;
   final _controller = TextEditingController();
   final _searchController = TextEditingController();
-  StreamSubscription<List<Todo>>? _todoSubscription;
-  List<Todo> _todos = [];
-  List<Todo>? _filteredTodos;
+  String _searchText = '';
   FilterSheetResult _filters = FilterSheetResult(
     sortBy: 'date',
     order: 'descending',
   );
 
   @override
-  void initState() {
-    super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _todoSubscription = getTodosForUser(user.uid).listen((todos) {
-        setState(() {
-          _todos = todos;
-          _filteredTodos = filterTodos();
-        });
-      });
-    }
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
     _searchController.dispose();
-    _todoSubscription?.cancel();
     super.dispose();
   }
 
-  List<Todo> filterTodos() {
-    List<Todo> filteredTodos = _todos.where((todo) {
-      return todo.text.toLowerCase().contains(_searchController.text.toLowerCase());
+  List<Todo> filterAndSortTodos(List<Todo> todos) {
+    List<Todo> filteredTodos = todos.where((todo) {
+      return todo.text.toLowerCase().contains(_searchText.toLowerCase());
     }).toList();
 
     if (_filters.sortBy == 'date') {
@@ -76,15 +59,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return filteredTodos;
-  }
-
-  Stream<List<Todo>> getTodosForUser(String userId) {
-    return FirebaseFirestore.instance
-        .collection('todos')
-        .where('uid', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((querySnapshot) => querySnapshot.docs.map((doc) => Todo.fromSnapshot(doc)).toList());
   }
 
   @override
@@ -133,136 +107,153 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          bool isDesktop = constraints.maxWidth > 600;
-          return Center(
-            child: SizedBox(
-              width: isDesktop ? 600 : double.infinity,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search),
-                        labelText: 'Search TODOs',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.filter_list),
-                          onPressed: () async {
-                            final result = await showModalBottomSheet<FilterSheetResult>(
-                              context: context,
-                              builder: (context) {
-                                return FilterSheet(initialFilters: _filters);
-                              },
-                            );
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('todos')
+            .orderBy('createdAt', descending: true)
+            .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
 
-                            if (result != null) {
-                              setState(() {
-                                _filters = result;
-                                _filteredTodos = filterTodos();
-                              });
-                            }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final todos = snapshot.data?.docs.map((doc) => Todo.fromSnapshot(doc)).toList() ?? [];
+          final filteredTodos = filterAndSortTodos(todos);
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              bool isDesktop = constraints.maxWidth > 600;
+              return Center(
+                child: SizedBox(
+                  width: isDesktop ? 600 : double.infinity,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search),
+                            labelText: 'Search TODOs',
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.filter_list),
+                              onPressed: () async {
+                                final result = await showModalBottomSheet<FilterSheetResult>(
+                                  context: context,
+                                  builder: (context) => FilterSheet(initialFilters: _filters),
+                                );
+                                if (result != null) {
+                                  setState(() => _filters = result);
+                                }
+                              },
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() => _searchText = value);
                           },
                         ),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _filteredTodos = filterTodos();
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: _filteredTodos?.isEmpty ?? true
-                        ? const Center(child: Text('No TODOs found'))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                            itemCount: _filteredTodos?.length ?? 0,
-                            itemBuilder: (context, index) {
-                              final todo = _filteredTodos?[index];
-                              if (todo == null) return const SizedBox.shrink();
-                              return ListTile(
-                                leading: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.circle,
-                                      color: todo.priority == 0
-                                          ? Colors.green
-                                          : todo.priority == 1
-                                          ? Colors.orange
-                                          : Colors.red,
-                                      size: 12,
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: filteredTodos.isEmpty
+                            ? const Center(child: Text('No TODOs found'))
+                            : ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                itemCount: filteredTodos.length,
+                                itemBuilder: (context, index) {
+                                  final todo = filteredTodos[index];
+                                  return ListTile(
+                                    leading: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.circle,
+                                          color: todo.priority == 0
+                                              ? Colors.green
+                                              : todo.priority == 1
+                                              ? Colors.orange
+                                              : Colors.red,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Checkbox(
+                                          value: todo.completedAt != null,
+                                          onChanged: (bool? value) {
+                                            final updateData = {
+                                              'completedAt': value == true ? FieldValue.serverTimestamp() : null
+                                            };
+                                            FirebaseFirestore.instance.collection('todos').doc(todo.id).update(updateData);
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Checkbox(
-                                      value: todo.completedAt != null,
-                                      onChanged: (bool? value) {
-                                        final updateData = {
-                                          'completedAt': value == true ? FieldValue.serverTimestamp() : null
-                                        };
-                                        FirebaseFirestore.instance.collection('todos').doc(todo.id).update(updateData);
-                                      },
+                                    trailing: Icon(Icons.arrow_forward_ios),
+                                    title: Text(
+                                      todo.text,
+                                      style: todo.completedAt != null
+                                          ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                          : null,
                                     ),
-                                  ],
-                                ),
-                                trailing: Icon(Icons.arrow_forward_ios),
-                                title: Text(
-                                  todo.text,
-                                  style: todo.completedAt != null
-                                      ? const TextStyle(decoration: TextDecoration.lineThrough)
-                                      : null,
-                                ),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => DetailScreen(todo: todo),
-                                    ),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => DetailScreen(todo: todo),
+                                        ),
+                                      );
+                                    },
                                   );
                                 },
-                              );
-                            },
-                          ),
-                  ),
-                  Container(
-                    color: Colors.green[100],
-                    padding: const EdgeInsets.all(32.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            keyboardType: TextInputType.text,
-                            controller: _controller,
-                            decoration: const InputDecoration(
-                              labelText: 'Enter Task:',
+                              ),
+                      ),
+                      Container(
+                        color: Colors.green[100],
+                        padding: const EdgeInsets.all(32.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                decoration: const InputDecoration(
+                                  labelText: 'Enter Task:',
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () async {
+                                if (user != null && _controller.text.isNotEmpty) {
+                                  await FirebaseFirestore.instance.collection('todos').add({
+                                    'text': _controller.text,
+                                    'createdAt': FieldValue.serverTimestamp(),
+                                    'uid': user.uid,
+                                    'category': 'None',
+                                    'dueAt': null,
+                                    'location': null,
+                                    'locationName': null,
+                                    'priority': 0,
+                                    'completedAt': null,
+                                    'subtasks': [],
+                                  });
+                                  _controller.clear();
+                                }
+                              },
+                              child: const Text('Add'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () async {
-                            if (user != null && _controller.text.isNotEmpty) {
-                              await FirebaseFirestore.instance.collection('todos').add({
-                                'text': _controller.text,
-                                'createdAt': FieldValue.serverTimestamp(),
-                                'uid': user.uid,
-                              });
-                              _controller.clear();
-                            }
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),

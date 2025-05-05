@@ -9,7 +9,7 @@ class Todo {
   final DateTime? dueAt;
   final GeoPoint? location;
   final String? locationName;
-  final String category;
+  String category;
   final List<Subtask> subtasks;
   final int priority;
 
@@ -46,13 +46,13 @@ class Todo {
     final data = snapshot.data() as Map<String, dynamic>;
     return Todo(
       id: snapshot.id,
-      text: data['text'],
-      uid: data['uid'],
+      text: data['text'] ?? '',
+      uid: data['uid'] ?? data['userId'] ?? '',
       createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
       completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
       dueAt: data['dueAt'] != null ? (data['dueAt'] as Timestamp).toDate() : null,
       location: data['location'] != null ? data['location'] as GeoPoint : null,
-      locationName: data['locationName'],
+      locationName: data['locationName'] ?? '',
       category: data['category'] ?? 'None',
       subtasks: (data['subtasks'] as List<dynamic>? ?? [])
           .map((subtaskData) => Subtask.fromSnapshot(subtaskData as Map<String, dynamic>))

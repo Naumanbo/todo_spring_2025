@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:latlong2/latlong.dart';
+import 'dart:async';
 import '../../data/todo.dart';
 import 'location_picker_screen.dart';
 
@@ -26,6 +27,7 @@ class _DetailScreenState extends State<DetailScreen> {
   DateTime? _selectedDueDate;
   GeoPoint? _selectedLocation;
   String? _selectedLocationName;
+  StreamSubscription<DocumentSnapshot>? _todoSubscription;
 
   @override
   void initState() {
@@ -34,6 +36,32 @@ class _DetailScreenState extends State<DetailScreen> {
     _selectedDueDate = widget.todo.dueAt;
     _priority = widget.todo.priority;
     _selectedLocation = widget.todo.location;
+    _selectedLocationName = widget.todo.locationName;
+    
+    // Add real-time listener
+    _todoSubscription = FirebaseFirestore.instance
+        .collection('todos')
+        .doc(widget.todo.id)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        setState(() {
+          _textController.text = data['text'] ?? '';
+          _selectedDueDate = (data['dueAt'] as Timestamp?)?.toDate();
+          _priority = data['priority'] ?? 0;
+          _selectedLocation = data['location'] as GeoPoint?;
+          _selectedLocationName = data['locationName'];
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _todoSubscription?.cancel();
+    _textController.dispose();
+    super.dispose();
   }
 
   Future<void> _updateLocation(GeoPoint? newLocation, String? locationName) async {
@@ -213,6 +241,9 @@ class _DetailScreenState extends State<DetailScreen> {
           .collection('todos')
           .doc(widget.todo.id)
           .update({'category': newCategory});
+      setState(() {
+        widget.todo.category = newCategory;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -288,12 +319,6 @@ class _DetailScreenState extends State<DetailScreen> {
       androidScheduleMode: AndroidScheduleMode.inexact,
       matchDateTimeComponents: DateTimeComponents.dateAndTime,
     );
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
   }
 
   @override
