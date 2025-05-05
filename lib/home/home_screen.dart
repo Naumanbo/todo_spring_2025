@@ -110,7 +110,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addTask() async {
-    if (_taskTitleController.text.isEmpty) return;
+    if (_taskTitleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task title cannot be empty. Please enter a title and try again.')),
+      );
+      return;
+    }
     
     // Show loading indicator
     setState(() {
