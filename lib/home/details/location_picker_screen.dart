@@ -7,7 +7,7 @@ import 'dart:convert';
 class LocationPickerScreen extends StatefulWidget {
   final LatLng? initialLocation;
 
-  const LocationPickerScreen({Key? key, this.initialLocation}) : super(key: key);
+  const LocationPickerScreen({super.key, this.initialLocation});
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();

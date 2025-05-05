@@ -321,6 +321,47 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  Widget _buildSubtasksList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Subtasks',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...widget.todo.subtasks.asMap().entries.map((entry) {
+          final int index = entry.key;
+          final subtask = entry.value;
+          final completedAt = subtask.completedAt;
+          return CheckboxListTile(
+            value: completedAt != null,
+            onChanged: (bool? value) async {
+              final List<Subtask> updatedSubtasks = List.from(widget.todo.subtasks);
+              updatedSubtasks[index] = Subtask(
+                text: subtask.text,
+                completedAt: value == true ? DateTime.now() : null,
+              );
+              await FirebaseFirestore.instance
+                  .collection('todos')
+                  .doc(widget.todo.id)
+                  .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+            },
+            title: Text(
+              subtask.text,
+              style: completedAt != null
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -458,7 +499,7 @@ class _DetailScreenState extends State<DetailScreen> {
                     builder: (context) {
                       return StatefulBuilder(
                         builder: (context, setState) {
-                          final TextEditingController _newCategoryController =
+                          final TextEditingController newCategoryController =
                               TextEditingController();
                           return AlertDialog(
                             title: const Text('Edit Category'),
@@ -535,7 +576,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   children: [
                                     Expanded(
                                       child: TextField(
-                                        controller: _newCategoryController,
+                                        controller: newCategoryController,
                                         decoration: const InputDecoration(
                                           labelText: 'New Custom Category',
                                         ),
@@ -545,14 +586,14 @@ class _DetailScreenState extends State<DetailScreen> {
                                       icon: const Icon(Icons.add),
                                       onPressed: () async {
                                         final newCat =
-                                            _newCategoryController.text.trim();
+                                            newCategoryController.text.trim();
                                         if (newCat.isNotEmpty &&
                                             !categories.contains(newCat)) {
                                           await addCategory(newCat);
                                           setState(() {
                                             categories.add(newCat);
                                             selectedCategory = newCat;
-                                            _newCategoryController.clear();
+                                            newCategoryController.clear();
                                           });
                                         }
                                       },
@@ -687,6 +728,8 @@ class _DetailScreenState extends State<DetailScreen> {
                 onPressed: _pickLocation,
               ),
             ),
+            const SizedBox(height: 16),
+            _buildSubtasksList(),
           ],
         ),
       ),

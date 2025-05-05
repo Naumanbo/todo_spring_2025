@@ -10,8 +10,8 @@ class Todo {
   final GeoPoint? location;
   final String? locationName;
   String category;
-  final List<Subtask> subtasks;
   final int priority;
+  final List<Subtask> subtasks;
 
   Todo({
     required this.id,
@@ -23,9 +23,34 @@ class Todo {
     required this.location,
     required this.locationName,
     required this.category,
-    required this.subtasks,
     required this.priority,
+    required this.subtasks,
   });
+
+  factory Todo.fromSnapshot(DocumentSnapshot snapshot) {
+    final data = snapshot.data() as Map<String, dynamic>;
+    return Todo(
+      id: snapshot.id,
+      text: data['text'] ?? '',
+      createdAt: (data['createdAt'] != null && data['createdAt'] is Timestamp)
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      completedAt: (data['completedAt'] != null && data['completedAt'] is Timestamp)
+          ? (data['completedAt'] as Timestamp).toDate()
+          : null,
+      dueAt: (data['dueAt'] != null && data['dueAt'] is Timestamp)
+          ? (data['dueAt'] as Timestamp).toDate()
+          : null,
+      uid: data['uid'] ?? '',
+      category: data['category'] ?? 'None',
+      location: data['location'],
+      locationName: data['locationName'],
+      priority: data['priority'] ?? 0,
+      subtasks: (data['subtasks'] as List<dynamic>? ?? [])
+          .map((subtask) => Subtask.fromSnapshot(subtask as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 
   Map<String, dynamic> toSnapshot() {
     return {
@@ -37,28 +62,9 @@ class Todo {
       'location': location,
       'locationName': locationName,
       'category': category,
-      'subtasks': subtasks.map((subtask) => subtask.toSnapshot()).toList(),
       'priority': priority,
+      'subtasks': subtasks.map((s) => s.toSnapshot()).toList(),
     };
-  }
-
-  factory Todo.fromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data() as Map<String, dynamic>;
-    return Todo(
-      id: snapshot.id,
-      text: data['text'] ?? '',
-      uid: data['uid'] ?? data['userId'] ?? '',
-      createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
-      completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
-      dueAt: data['dueAt'] != null ? (data['dueAt'] as Timestamp).toDate() : null,
-      location: data['location'] != null ? data['location'] as GeoPoint : null,
-      locationName: data['locationName'] ?? '',
-      category: data['category'] ?? 'None',
-      subtasks: (data['subtasks'] as List<dynamic>? ?? [])
-          .map((subtaskData) => Subtask.fromSnapshot(subtaskData as Map<String, dynamic>))
-          .toList(),
-      priority: data['priority'] ?? 0,
-    );
   }
 }
 

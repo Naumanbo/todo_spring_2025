@@ -7,7 +7,6 @@ import '../data/todo.dart';
 import 'details/detail_screen.dart';
 import 'details/location_picker_screen.dart';
 import 'filter/filter_sheet.dart';
-import 'task_creation_screen.dart';  // Add this import
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -20,33 +19,54 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with RouteAware {
-  final List<String> _themeOptions = [
-    'Light Theme',
-    'Dark Theme',
-    'Gradient Theme 1',
-    'Gradient Theme 2',
-    'Gradient Theme 3',
-  ];
-
+class _HomeScreenState extends State<HomeScreen> {
+  final List<String> _themeOptions = ['Light Theme', 'Dark Theme', 'Gradient Theme 1', 'Gradient Theme 2', 'Gradient Theme 3'];
   int _selectedThemeIndex = 0;
   final _searchController = TextEditingController();
   String _searchText = '';
-  FilterSheetResult _filters = FilterSheetResult(
-    sortBy: 'date',
-    order: 'descending',
-  );
-  bool _isTaskFormExpanded = false;
+  FilterSheetResult _filters = FilterSheetResult(sortBy: 'date', order: 'descending');
+  bool _isAddingTask = false;
+  final _taskTitleController = TextEditingController();
+  String _selectedCategory = 'None';
+  DateTime? _selectedDueDate;
+  int _selectedPriority = 0;
+  GeoPoint? _selectedLocation;
+  String? _selectedLocationName;
+  List<String> _categories = ['None', 'Home', 'Work', 'School'];
+  final List<TextEditingController> _subtaskControllers = [];
+  final _scrollController = ScrollController();
+  StreamSubscription<QuerySnapshot>? _categoriesSubscription;
 
   @override
   void initState() {
     super.initState();
+    _setupCategoriesListener();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _taskTitleController.dispose();
+    _categoriesSubscription?.cancel();
+    for (var controller in _subtaskControllers) {
+      controller.dispose();
+    }
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _setupCategoriesListener() {
+    _categoriesSubscription = FirebaseFirestore.instance
+        .collection('categories')
+        .snapshots()
+        .listen((snapshot) {
+      final customCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
+      if (mounted) {
+        setState(() {
+          _categories = ['None', 'Home', 'Work', 'School', ...customCategories];
+        });
+      }
+    });
   }
 
   List<Todo> filterAndSortTodos(List<Todo> todos) {
@@ -68,269 +88,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     return filteredTodos;
   }
 
-  Widget _buildAddTaskSection(BuildContext context, User user) {
-    return TaskCreationScreen(
-      user: user,
-      onTaskAdded: () {
-        // No need to do anything as StreamBuilder will handle updates
-      },
-      isExpanded: _isTaskFormExpanded,
-      onExpandToggle: () {
-        setState(() {
-          _isTaskFormExpanded = !_isTaskFormExpanded;
-        });
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          DropdownButton<int>(
-            value: _selectedThemeIndex,
-            icon: Icon(
-              Icons.color_lens,
-              color: _selectedThemeIndex == 1 ? Colors.white : Colors.black,
-            ),
-            dropdownColor: _selectedThemeIndex == 1 ? Colors.grey[800] : Colors.white,
-            items: List.generate(
-              _themeOptions.length,
-              (index) => DropdownMenuItem(
-                value: index,
-                child: Text(
-                  _themeOptions[index],
-                  style: TextStyle(
-                    // All text items will be white when dark theme is selected,
-                    // black for all other themes
-                    color: _selectedThemeIndex == 1 ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-            ),
-            onChanged: (int? newIndex) {
-              if (newIndex != null) {
-                setState(() {
-                  _selectedThemeIndex = newIndex;
-                });
-                widget.onThemeChanged(newIndex);
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('todos')
-            .orderBy('createdAt', descending: true)
-            .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final todos = snapshot.data?.docs.map((doc) => Todo.fromSnapshot(doc)).toList() ?? [];
-          final filteredTodos = filterAndSortTodos(todos);
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              bool isDesktop = constraints.maxWidth > 600;
-              return Center(
-                child: SizedBox(
-                  width: isDesktop ? 600 : double.infinity,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.search),
-                            labelText: 'Search TODOs',
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.filter_list),
-                              onPressed: () async {
-                                final result = await showModalBottomSheet<FilterSheetResult>(
-                                  context: context,
-                                  builder: (context) => FilterSheet(initialFilters: _filters),
-                                );
-                                if (result != null) {
-                                  setState(() => _filters = result);
-                                }
-                              },
-                            ),
-                          ),
-                          onChanged: (value) {
-                            setState(() => _searchText = value);
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: filteredTodos.isEmpty
-                            ? const Center(child: Text('No TODOs found'))
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                itemCount: filteredTodos.length,
-                                itemBuilder: (context, index) {
-                                  final todo = filteredTodos[index];
-                                  return ListTile(
-                                    leading: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.circle,
-                                          color: todo.priority == 0
-                                              ? Colors.green
-                                              : todo.priority == 1
-                                              ? Colors.orange
-                                              : Colors.red,
-                                          size: 12,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Checkbox(
-                                          value: todo.completedAt != null,
-                                          onChanged: (bool? value) {
-                                            final updateData = {
-                                              'completedAt': value == true ? FieldValue.serverTimestamp() : null
-                                            };
-                                            FirebaseFirestore.instance.collection('todos').doc(todo.id).update(updateData);
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Icon(Icons.arrow_forward_ios),
-                                    title: Text(
-                                      todo.text,
-                                      style: todo.completedAt != null
-                                          ? const TextStyle(decoration: TextDecoration.lineThrough)
-                                          : null,
-                                    ),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => DetailScreen(todo: todo),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                      _buildAddTaskSection(context, user!),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class AddTaskForm extends StatefulWidget {
-  final User user;
-  final VoidCallback onTaskAdded;
-
-  const AddTaskForm({
-    Key? key,
-    required this.user,
-    required this.onTaskAdded,
-  }) : super(key: key);
-
-  @override
-  State<AddTaskForm> createState() => _AddTaskFormState();
-}
-
-class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
-  final _controller = TextEditingController();
-  bool _isExpanded = false;
-  String _category = 'None';
-  DateTime? _dueDate;
-  int _priority = 0;
-  GeoPoint? _location;
-  String? _locationName;
-  List<String> _categories = ['None', 'Home', 'Work', 'School'];
-  final ScrollController _scrollController = ScrollController();
-  StreamSubscription<QuerySnapshot>? _categoriesSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _setupCategoriesListener();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    routeObserver.subscribe(this, ModalRoute.of(context)!);
-  }
-
-  @override
-  void dispose() {
-    routeObserver.unsubscribe(this);
-    _controller.dispose();
-    _scrollController.dispose();
-    _categoriesSubscription?.cancel();
-    super.dispose();
-  }
-
-  @override
-  void didPopNext() {
-    // Reset form when returning from detail screen
-    _resetForm();
-  }
-
-  void _resetForm() {
-    _controller.clear();
-    setState(() {
-      _category = 'None';
-      _dueDate = null;
-      _priority = 0;
-      _location = null;
-      _locationName = null;
-    });
-  }
-
-  void _setupCategoriesListener() {
-    _categoriesSubscription = FirebaseFirestore.instance
-        .collection('categories')
-        .snapshots()
-        .listen((snapshot) {
-      final customCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
-      if (mounted) {
-        setState(() {
-          _categories = ['None', 'Home', 'Work', 'School', ...customCategories];
-        });
-      }
-    });
-  }
-
   Future<void> _pickLocation() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => LocationPickerScreen(
-          initialLocation: _location != null
-              ? LatLng(_location!.latitude, _location!.longitude)
+          initialLocation: _selectedLocation != null
+              ? LatLng(_selectedLocation!.latitude, _selectedLocation!.longitude)
               : null,
         ),
       ),
@@ -339,61 +103,59 @@ class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
       final LatLng pickedLocation = result['location'];
       final String? locationName = result['name'];
       setState(() {
-        _location = GeoPoint(pickedLocation.latitude, pickedLocation.longitude);
-        _locationName = locationName ?? 'Lat: ${pickedLocation.latitude}, Lng: ${pickedLocation.longitude}';
+        _selectedLocation = GeoPoint(pickedLocation.latitude, pickedLocation.longitude);
+        _selectedLocationName = locationName ?? 'Lat: ${pickedLocation.latitude}, Lng: ${pickedLocation.longitude}';
       });
     }
   }
 
-  Future<void> _pickDateTime(BuildContext context) async {
-    final DateTime? selectedDate = await showDatePicker(
-      context: context,
-      initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2050),
-    );
+  Future<void> _addTask() async {
+    if (_taskTitleController.text.isEmpty) return;
     
-    if (selectedDate != null && mounted) {
-      final TimeOfDay? selectedTime = await showTimePicker(
-        context: context,
-        initialTime: _dueDate != null
-            ? TimeOfDay.fromDateTime(_dueDate!)
-            : TimeOfDay.now(),
-      );
-      
-      if (selectedTime != null && mounted) {
-        setState(() {
-          _dueDate = DateTime(
-            selectedDate.year,
-            selectedDate.month,
-            selectedDate.day,
-            selectedTime.hour,
-            selectedTime.minute,
-          );
-        });
+    // Show loading indicator
+    setState(() {
+      _isAddingTask = false;
+    });
+
+    try {
+      List<Map<String, dynamic>> subtasks = _subtaskControllers
+          .map((controller) => {
+                'text': controller.text.trim(),
+                'completedAt': null,
+              })
+          .where((subtask) => (subtask['text'] as String).isNotEmpty)
+          .toList();
+
+      await FirebaseFirestore.instance.collection('todos').add({
+        'text': _taskTitleController.text,
+        'createdAt': FieldValue.serverTimestamp(),
+        'uid': FirebaseAuth.instance.currentUser!.uid,
+        'category': _selectedCategory,
+        'dueAt': _selectedDueDate != null ? Timestamp.fromDate(_selectedDueDate!) : null,
+        'location': _selectedLocation,
+        'locationName': _selectedLocationName,
+        'priority': _selectedPriority,
+        'completedAt': null,
+        'subtasks': subtasks,
+      });
+
+      _resetTaskForm();
+    } catch (e) {
+      // Show error if task creation fails
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create task: $e')),
+        );
       }
     }
   }
 
-  Future<void> _addCategory(String categoryName) async {
+  // Add helper function for category management
+  Future<void> addCategory(String newCategory) async {
     try {
-      // First check if category already exists
-      final existingCategories = await FirebaseFirestore.instance
-          .collection('categories')
-          .where('name', isEqualTo: categoryName)
-          .get();
-      
-      if (existingCategories.docs.isEmpty) {
-        await FirebaseFirestore.instance
-            .collection('categories')
-            .add({'name': categoryName});
-      }
-      
-      setState(() {
-        if (!_categories.contains(categoryName)) {
-          _categories.add(categoryName);
-        }
-        _category = categoryName;
+      await FirebaseFirestore.instance.collection('categories').add({
+        'name': newCategory,
+        'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       if (mounted) {
@@ -404,276 +166,137 @@ class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
     }
   }
 
-  Future<void> _addTask() async {
-    if (widget.user != null && _controller.text.isNotEmpty) {
-      await FirebaseFirestore.instance.collection('todos').add({
-        'text': _controller.text,
-        'createdAt': FieldValue.serverTimestamp(),
-        'uid': widget.user.uid,
-        'category': _category,  // Use the selected category
-        'dueAt': _dueDate != null ? Timestamp.fromDate(_dueDate!) : null,
-        'location': _location,
-        'locationName': _locationName,
-        'priority': _priority,
-        'completedAt': null,
-        'subtasks': [],
-      });
-      _resetForm();
-      widget.onTaskAdded();
-    }
-  }
-
-  Future<void> _cleanupUnusedCategories() async {
-    const defaultCategories = ['None', 'Home', 'Work', 'School'];
-    final categoriesSnapshot = await FirebaseFirestore.instance.collection('categories').get();
-    
-    for (var categoryDoc in categoriesSnapshot.docs) {
-      final categoryName = categoryDoc['name'] as String;
-      if (!defaultCategories.contains(categoryName)) {
-        // Check if any todos use this category
-        final todosWithCategory = await FirebaseFirestore.instance
-            .collection('todos')
-            .where('category', isEqualTo: categoryName)
-            .get();
-            
-        if (todosWithCategory.docs.isEmpty) {
-          // If no todos use this category, delete it
-          await categoryDoc.reference.delete();
-        }
+  void _resetTaskForm() {
+    setState(() {
+      _taskTitleController.clear();
+      _selectedCategory = 'None';
+      _selectedDueDate = null;
+      _selectedPriority = 0;
+      _selectedLocation = null;
+      _selectedLocationName = null;
+      for (var controller in _subtaskControllers) {
+        controller.dispose();
       }
-    }
-    await _fetchCategories(); // Refresh categories list
+      _subtaskControllers.clear();
+    });
   }
 
-  Future<void> _fetchCategories() async {
-    final snapshot = await FirebaseFirestore.instance.collection('categories').get();
-    final customCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
-    if (mounted) {
+  void _addSubtask() {
+    if (_subtaskControllers.length < 10) {
       setState(() {
-        _categories = ['None', 'Home', 'Work', 'School', ...customCategories];
+        _subtaskControllers.add(TextEditingController());
       });
     }
   }
 
-  Future<void> _showCategoryDialog(BuildContext context) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Edit Category'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<String>(
-                value: _category,
-                isExpanded: true,
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    key: ValueKey(category),
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _category = value;
-                    });
-                  }
-                },
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: TextEditingController(),
-                      decoration: const InputDecoration(
-                        labelText: 'New Custom Category',
-                      ),
-                      onSubmitted: (newCat) async {
-                        if (newCat.isNotEmpty && !_categories.contains(newCat)) {
-                          await _addCategory(newCat);
-                          setState(() {
-                            _category = newCat;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
-            ),
-          ],
-        );
-      },
-    );
+  void _removeSubtask(int index) {
+    setState(() {
+      _subtaskControllers[index].dispose();
+      _subtaskControllers.removeAt(index);
+    });
   }
 
-  Future<void> _showPriorityDialog(BuildContext context) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Priority'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<int>(
-                key: const ValueKey('priority-low'),
-                value: 0,
-                groupValue: _priority,
-                title: const Text('Low'),
-                onChanged: (value) {
-                  setState(() {
-                    _priority = value!;
-                  });
-                },
-              ),
-              RadioListTile<int>(
-                key: const ValueKey('priority-medium'),
-                value: 1,
-                groupValue: _priority,
-                title: const Text('Medium'),
-                onChanged: (value) {
-                  setState(() {
-                    _priority = value!;
-                  });
-                },
-              ),
-              RadioListTile<int>(
-                key: const ValueKey('priority-high'),
-                value: 2,
-                groupValue: _priority,
-                title: const Text('High'),
-                onChanged: (value) {
-                  setState(() {
-                    _priority = value!;
-                  });
-                },
-              ),
-            ],
+  Widget _buildTaskForm() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.green[100],
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done'),
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: Colors.green[100],
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isExpanded ? 'Hide Add Task' : 'Add Task',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ),
-                Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-              ],
-            ),
-          ),
-          // ...existing code...
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 300),
-            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            firstChild: const SizedBox.shrink(),
-            secondChild: SizedBox(
-              height: 320,
-              child: Scrollbar(
-                controller: _scrollController,
-                child: ListView(
-                  key: const ValueKey('add-task-form'),
-                  controller: _scrollController,
+            child: SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Add New Task',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() => _isAddingTask = false),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     TextField(
-                      key: const ValueKey('task-title'),
-                      controller: _controller,
+                      controller: _taskTitleController,
                       decoration: const InputDecoration(
                         labelText: 'Task Title',
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     ListTile(
-                      key: const ValueKey('category-tile'),
                       title: const Text('Category'),
-                      subtitle: Text(_category),
+                      subtitle: Text(_selectedCategory),
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
-                        onPressed: () => _showCategoryDialog(context),
+                        onPressed: () => _showCategoryDialog(),
                       ),
                     ),
                     ListTile(
-                      key: const ValueKey('due-date-tile'),
                       title: const Text('Due Date'),
-                      subtitle: Text(_dueDate != null 
-                        ? _dueDate!.toLocal().toString().split('.')[0] 
-                        : 'No due date'),
+                      subtitle: Text(_selectedDueDate?.toString() ?? 'No due date'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (_dueDate != null)
+                          if (_selectedDueDate != null)
                             IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                setState(() {
-                                  _dueDate = null;
-                                });
-                              },
+                              icon: const Icon(Icons.clear),
+                              onPressed: () => setState(() => _selectedDueDate = null),
                             ),
                           IconButton(
                             icon: const Icon(Icons.calendar_today),
-                            onPressed: () => _pickDateTime(context),
+                            onPressed: () => _showDateTimePicker(),
                           ),
                         ],
                       ),
                     ),
                     ListTile(
-                      key: const ValueKey('priority-tile'),
                       title: const Text('Priority'),
                       subtitle: Row(
                         children: [
                           Icon(
                             Icons.circle,
-                            color: _priority == 0
+                            color: _selectedPriority == 0
                                 ? Colors.green
-                                : _priority == 1
+                                : _selectedPriority == 1
                                     ? Colors.orange
                                     : Colors.red,
                             size: 16,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            _priority == 0
+                            _selectedPriority == 0
                                 ? 'Low'
-                                : _priority == 1
+                                : _selectedPriority == 1
                                     ? 'Medium'
                                     : 'High',
                           ),
@@ -681,36 +304,356 @@ class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.edit),
-                        onPressed: () => _showPriorityDialog(context),
+                        onPressed: () => _showPriorityDialog(),
                       ),
                     ),
                     ListTile(
-                      key: const ValueKey('location-tile'),
                       title: const Text('Location'),
-                      subtitle: Text(_locationName ??
-                          (_location != null
-                              ? 'Lat: ${_location!.latitude}, Lng: ${_location!.longitude}'
-                              : 'No location')),
+                      subtitle: Text(_selectedLocationName ?? 'No location set'),
                       trailing: IconButton(
-                        icon: const Icon(Icons.edit),
+                        icon: const Icon(Icons.edit_location),
                         onPressed: _pickLocation,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Subtasks',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (_subtaskControllers.length < 10)
+                                  IconButton(
+                                    icon: const Icon(Icons.add),
+                                    onPressed: _addSubtask,
+                                  ),
+                              ],
+                            ),
+                            ..._subtaskControllers.asMap().entries.map((entry) {
+                              int idx = entry.key;
+                              var controller = entry.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: controller,
+                                        decoration: InputDecoration(
+                                          labelText: 'Subtask ${idx + 1}',
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline),
+                                      onPressed: () => _removeSubtask(idx),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     ElevatedButton(
-                      key: const ValueKey('add-task-button'),
                       onPressed: () async {
                         await _addTask();
-                        await _cleanupUnusedCategories();
+                        if (mounted) {
+                          setState(() => _isAddingTask = false);
+                        }
                       },
                       child: const Text('Add Task'),
                     ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showDateTimePicker() async {
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDueDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (date == null) return;
+
+    if (!mounted) return;
+
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_selectedDueDate ?? DateTime.now()),
+    );
+
+    if (time == null) return;
+
+    setState(() {
+      _selectedDueDate = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
+  }
+
+  Future<void> _showPriorityDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Set Priority'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<int>(
+              title: const Text('Low'),
+              value: 0,
+              groupValue: _selectedPriority,
+              onChanged: (value) {
+                setState(() => _selectedPriority = value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<int>(
+              title: const Text('Medium'),
+              value: 1,
+              groupValue: _selectedPriority,
+              onChanged: (value) {
+                setState(() => _selectedPriority = value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<int>(
+              title: const Text('High'),
+              value: 2,
+              groupValue: _selectedPriority,
+              onChanged: (value) {
+                setState(() => _selectedPriority = value!);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCategoryDialog() async {
+    String? selectedCategory = _selectedCategory;
+    final textController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Category'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButton<String>(
+              value: selectedCategory,
+              isExpanded: true,
+              items: _categories.map((category) {
+                return DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => _selectedCategory = value!);
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: textController,
+              decoration: const InputDecoration(
+                labelText: 'Add New Category',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newCategory = textController.text.trim();
+              if (newCategory.isNotEmpty && !_categories.contains(newCategory)) {
+                await addCategory(newCategory);
+                setState(() {
+                  _selectedCategory = newCategory;
+                });
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Add New'),
+          ),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home'),
+        actions: [
+          DropdownButton<int>(
+            value: _selectedThemeIndex,
+            icon: Icon(Icons.color_lens, color: _selectedThemeIndex == 1 ? Colors.white : Colors.black),
+            items: List.generate(
+              _themeOptions.length,
+              (index) => DropdownMenuItem(value: index, child: Text(_themeOptions[index])),
+            ),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedThemeIndex = value);
+                widget.onThemeChanged(value);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Search',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    onPressed: () async {
+                      final result = await showModalBottomSheet<FilterSheetResult>(
+                        context: context,
+                        builder: (context) => FilterSheet(initialFilters: _filters),
+                      );
+                      if (result != null) {
+                        setState(() => _filters = result);
+                      }
+                    },
+                  ),
+                ),
+                onChanged: (value) => setState(() => _searchText = value),
+              ),
+            ),
+            Expanded(
+              child: Stack(
+                children: [
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('todos')
+                        .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final todos = snapshot.data?.docs
+                          .map((doc) => Todo.fromSnapshot(doc))
+                          .toList() ?? [];
+                      final filteredTodos = filterAndSortTodos(todos);
+
+                      return ListView.builder(
+                        itemCount: filteredTodos.length,
+                        itemBuilder: (context, index) {
+                          final todo = filteredTodos[index];
+                          return ListTile(
+                            leading: Checkbox(
+                              value: todo.completedAt != null,
+                              onChanged: (value) {
+                                FirebaseFirestore.instance.collection('todos').doc(todo.id).update({
+                                  'completedAt': value == true ? FieldValue.serverTimestamp() : null,
+                                });
+                              },
+                            ),
+                            title: Text(
+                              todo.text,
+                              style: todo.completedAt != null
+                                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                  : null,
+                            ),
+                            subtitle: Text(todo.category),
+                            trailing: Icon(
+                              Icons.circle,
+                              color: todo.priority == 0
+                                  ? Colors.green
+                                  : todo.priority == 1
+                                      ? Colors.orange
+                                      : Colors.red,
+                              size: 12,
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DetailScreen(todo: todo),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  if (_isAddingTask)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isAddingTask = false),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.5),
+                          child: GestureDetector(
+                            onTap: () {}, // Prevent tap from propagating
+                            child: _buildTaskForm(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => setState(() => _isAddingTask = !_isAddingTask),
+        child: Icon(_isAddingTask ? Icons.close : Icons.add),
       ),
     );
   }
