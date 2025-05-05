@@ -549,16 +549,96 @@ class _DetailScreenState extends State<DetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _textController,
-                decoration: const InputDecoration(
-                  border: UnderlineInputBorder(),
-                ),
-                onSubmitted: (newText) async {
-                  if (newText.isNotEmpty && newText != widget.todo.text) {
-                    await _updateText(newText);
-                  }
-                },
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          decoration: const InputDecoration(
+                            border: UnderlineInputBorder(),
+                          ),
+                          onSubmitted: (newText) async {
+                            if (newText.isNotEmpty && newText != widget.todo.text) {
+                              await _updateText(newText);
+                            }
+                          },
+                        ),
+                      ),
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('todos')
+                            .doc(widget.todo.id)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox.shrink();
+                          final data = snapshot.data!.data() as Map<String, dynamic>?;
+                          final completedAt = data?['completedAt'] as Timestamp?;
+                          
+                          return Checkbox(
+                            value: completedAt != null,
+                            onChanged: (bool? value) async {
+                              final timestamp = value == true ? Timestamp.now() : null;
+                              final todoDoc = await FirebaseFirestore.instance
+                                  .collection('todos')
+                                  .doc(widget.todo.id)
+                                  .get();
+                              
+                              if (todoDoc.exists) {
+                                final data = todoDoc.data();
+                                if (data != null && data['subtasks'] != null) {
+                                  final List<dynamic> subtasks = data['subtasks'];
+                                  
+                                  if (value == true) {
+                                    final updatedSubtasks = subtasks.map((s) {
+                                      final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                      subtask['completedAt'] = timestamp;
+                                      return subtask;
+                                    }).toList();
+                                    
+                                    await FirebaseFirestore.instance
+                                        .collection('todos')
+                                        .doc(widget.todo.id)
+                                        .update({
+                                          'completedAt': timestamp,
+                                          'subtasks': updatedSubtasks,
+                                        });
+                                  } else {
+                                    final updatedSubtasks = subtasks.map((s) {
+                                      final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                      subtask['completedAt'] = null;
+                                      return subtask;
+                                    }).toList();
+                                    
+                                    await FirebaseFirestore.instance
+                                        .collection('todos')
+                                        .doc(widget.todo.id)
+                                        .update({
+                                          'completedAt': null,
+                                          'subtasks': updatedSubtasks,
+                                        });
+                                  }
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Created: ${widget.todo.createdAt.toLocal().toString().split('.')[0]}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               ListTile(

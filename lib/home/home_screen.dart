@@ -691,7 +691,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ? const TextStyle(decoration: TextDecoration.lineThrough)
                                   : null,
                             ),
-                            subtitle: Text(todo.category),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(todo.category),
+                                Text(
+                                  todo.dueAt != null 
+                                      ? 'Due: ${todo.dueAt!.toLocal().toString().split('.')[0]}'
+                                      : 'Due: N/A',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                                  ),
+                                ),
+                              ],
+                            ),
                             trailing: Icon(
                               Icons.circle,
                               color: todo.priority == 0
