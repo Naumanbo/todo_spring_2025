@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyDPcraoJTOwmVn_JYSJ1Tr_MbPhO1Eihag</string>
-	<key>GCM_SENDER_ID</key>
-	<string>597728781701</string>
+	<string>AIzaSyCD-Hm-gMJVqnjVCL1Rw42XWUlOhThYIqk</string>
+	<key>573303993251</key>
+	<string>573303993251</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.example.todoSpring2025</string>
 	<key>PROJECT_ID</key>
-	<string>todo-spring-2025-0</string>
+	<string>todo-spring-2025-833d9</string>
 	<key>STORAGE_BUCKET</key>
-	<string>todo-spring-2025-0.firebasestorage.app</string>
+	<string>todo-spring-2025-833d9.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:597728781701:ios:cbfb5399218726ecc6d0ec</string>
+	<string>1:573303993251:ios:ee1a0bfd68bd9cdd95a016</string>
 </dict>
 </plist>

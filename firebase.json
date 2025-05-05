@@ -3,15 +3,15 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "todo-spring-2025-0",
-          "appId": "1:597728781701:android:cbd5b8da0c65ca25c6d0ec",
+          "projectId": "todo-spring-2025-833d9",
+          "appId": "1:573303993251:android:a45a66c2c1fee5ae95a016",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "ios": {
         "default": {
-          "projectId": "todo-spring-2025-0",
-          "appId": "1:597728781701:ios:cbfb5399218726ecc6d0ec",
+          "projectId": "todo-spring-2025-833d9",
+          "appId": "1:573303993251:ios:ee1a0bfd68bd9cdd95a016",
           "uploadDebugSymbols": false,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
@@ -20,9 +20,9 @@
         "lib/firebase_options.dart": {
           "projectId": "todo-spring-2025-0",
           "configurations": {
-            "android": "1:597728781701:android:cbd5b8da0c65ca25c6d0ec",
-            "ios": "1:597728781701:ios:cbfb5399218726ecc6d0ec",
-            "web": "1:597728781701:web:54879df9241dff14c6d0ec"
+            "android": "1:573303993251:android:a45a66c2c1fee5ae95a016",
+            "ios": "1:573303993251:ios:ee1a0bfd68bd9cdd95a016",
+            "web": "1:573303993251:web:e7b15d533971900795a016"
           }
         }
       }

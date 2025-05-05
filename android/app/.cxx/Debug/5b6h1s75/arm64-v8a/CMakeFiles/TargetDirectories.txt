@@ -1,0 +1,2 @@
+C:/Users/Nauman Siddiqui/Desktop/app_dev/todo_spring_2025/android/app/.cxx/Debug/5b6h1s75/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/Nauman Siddiqui/Desktop/app_dev/todo_spring_2025/android/app/.cxx/Debug/5b6h1s75/arm64-v8a/CMakeFiles/rebuild_cache.dir

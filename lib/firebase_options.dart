@@ -47,28 +47,28 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCsd6RH9AhfBR2IQ4Ggn00K5PQb-ZPCkTk',
-    appId: '1:597728781701:web:54879df9241dff14c6d0ec',
-    messagingSenderId: '597728781701',
-    projectId: 'todo-spring-2025-0',
-    authDomain: 'todo-spring-2025-0.firebaseapp.com',
-    storageBucket: 'todo-spring-2025-0.firebasestorage.app',
+    apiKey: 'AIzaSyDA7niG3RATQdc9awmqPEkRPjDrP3WyliA',
+    appId: '1:573303993251:web:e7b15d533971900795a016',
+    messagingSenderId: '573303993251',
+    projectId: 'todo-spring-2025-833d9',
+    authDomain: 'todo-spring-2025-833d9.firebaseapp.com',
+    storageBucket: 'todo-spring-2025-833d9.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAx0DwL5MWQ85msIlEvTzQLL1lehZoEs1o',
-    appId: '1:597728781701:android:cbd5b8da0c65ca25c6d0ec',
-    messagingSenderId: '597728781701',
-    projectId: 'todo-spring-2025-0',
-    storageBucket: 'todo-spring-2025-0.firebasestorage.app',
+    apiKey: 'AIzaSyAW9Sih05BAQD2VHNLTijdYkxCzcqzQg5A',
+    appId: '1:573303993251:android:a45a66c2c1fee5ae95a016',
+    messagingSenderId: '573303993251',
+    projectId: 'todo-spring-2025-833d9',
+    storageBucket: 'todo-spring-2025-833d9.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDPcraoJTOwmVn_JYSJ1Tr_MbPhO1Eihag',
-    appId: '1:597728781701:ios:cbfb5399218726ecc6d0ec',
-    messagingSenderId: '597728781701',
-    projectId: 'todo-spring-2025-0',
-    storageBucket: 'todo-spring-2025-0.firebasestorage.app',
+    apiKey: 'AIzaSyCD-Hm-gMJVqnjVCL1Rw42XWUlOhThYIqk',
+    appId: '1:573303993251:ios:ee1a0bfd68bd9cdd95a016',
+    messagingSenderId: '573303993251',
+    projectId: 'todo-spring-2025-833d9',
+    storageBucket: 'todo-spring-2025-833d9.firebasestorage.app',
     iosBundleId: 'com.example.todoSpring2025',
   );
 }
