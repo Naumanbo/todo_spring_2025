@@ -123,13 +123,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      // Filter out empty subtasks and create subtasks list
       List<Map<String, dynamic>> subtasks = _subtaskControllers.asMap().entries
           .map((entry) => {
                 'text': entry.value.text.trim(),
-                'completedAt': _subtaskCompletionStatus[entry.key] ? DateTime.now() : null,
+                'completedAt': _subtaskCompletionStatus[entry.key] ? Timestamp.now() : null,
               })
           .where((subtask) => (subtask['text'] as String).isNotEmpty)
           .toList();
+
+      // Check if all non-empty subtasks are completed
+      final allSubtasksCompleted = subtasks.isNotEmpty && 
+          subtasks.every((subtask) => subtask['completedAt'] != null);
 
       await FirebaseFirestore.instance.collection('todos').add({
         'text': _taskTitleController.text,
@@ -140,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'location': _selectedLocation,
         'locationName': _selectedLocationName,
         'priority': _selectedPriority,
-        'completedAt': null,
+        'completedAt': allSubtasksCompleted ? Timestamp.now() : null,
         'subtasks': subtasks,
       });
 
