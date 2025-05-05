@@ -1,14 +1,13 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-
 import '../data/todo.dart';
 import 'details/detail_screen.dart';
 import 'details/location_picker_screen.dart';
 import 'filter/filter_sheet.dart';
+import 'task_creation_screen.dart';  // Add this import
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -37,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     sortBy: 'date',
     order: 'descending',
   );
+  bool _isTaskFormExpanded = false;
 
   @override
   void initState() {
@@ -69,11 +69,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildAddTaskSection(BuildContext context, User user) {
-    return AddTaskForm(
+    return TaskCreationScreen(
       user: user,
-      onTaskAdded: () async {
-        // This callback will be called after a task is added
-        // No need to do anything here as StreamBuilder will handle updates
+      onTaskAdded: () {
+        // No need to do anything as StreamBuilder will handle updates
+      },
+      isExpanded: _isTaskFormExpanded,
+      onExpandToggle: () {
+        setState(() {
+          _isTaskFormExpanded = !_isTaskFormExpanded;
+        });
       },
     );
   }
@@ -450,284 +455,263 @@ class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return StatefulBuilder(
-      builder: (context, setAddTaskState) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          color: Colors.green[100],
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
+  Future<void> _showCategoryDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit Category'),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
-                onTap: () {
-                  setAddTaskState(() {
-                    _isExpanded = !_isExpanded;
-                  });
+              DropdownButton<String>(
+                value: _category,
+                isExpanded: true,
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    key: ValueKey(category),
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _category = value;
+                    });
+                  }
                 },
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _isExpanded ? 'Hide Add Task' : 'Add Task',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                    ),
-                    Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-                  ],
-                ),
               ),
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 300),
-                crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                firstChild: const SizedBox.shrink(),
-                secondChild: SizedBox(
-                  height: 320,
-                  child: Scrollbar(
-                    controller: _scrollController,
-                    child: ListView(
-                      controller: _scrollController,
-                      children: [
-                        TextField(
-                          controller: _controller,
-                          decoration: const InputDecoration(
-                            labelText: 'Task Title',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ListTile(
-                          title: const Text('Category'),
-                          subtitle: Text(_category),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: () async {
-                              String selectedCategory = _category;
-                              final TextEditingController newCategoryController = TextEditingController();
-                              
-                              await showDialog(
-                                context: context,
-                                builder: (dialogContext) {
-                                  return StatefulBuilder(
-                                    builder: (context, setStateDialog) {
-                                      return AlertDialog(
-                                        title: const Text('Edit Category'),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            DropdownButton<String>(
-                                              value: selectedCategory,
-                                              isExpanded: true,
-                                              items: _categories.map((category) {
-                                                return DropdownMenuItem(
-                                                  value: category,
-                                                  child: Text(category),
-                                                );
-                                              }).toList(),
-                                              onChanged: (value) {
-                                                setStateDialog(() {
-                                                  selectedCategory = value!;
-                                                });
-                                              },
-                                            ),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: TextField(
-                                                    controller: newCategoryController,
-                                                    decoration: const InputDecoration(
-                                                      labelText: 'New Custom Category',
-                                                    ),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(Icons.add),
-                                                  onPressed: () async {
-                                                    final newCat = newCategoryController.text.trim();
-                                                    if (newCat.isNotEmpty && !_categories.contains(newCat)) {
-                                                      await _addCategory(newCat);
-                                                      setStateDialog(() {
-                                                        selectedCategory = newCat;
-                                                      });
-                                                      newCategoryController.clear();
-                                                    }
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              setState(() {
-                                                _category = selectedCategory;
-                                              });
-                                            },
-                                            child: const Text('Save'),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('Due Date'),
-                          subtitle: Text(_dueDate != null 
-                            ? _dueDate!.toLocal().toString().split('.')[0] 
-                            : 'No due date'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_dueDate != null)
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () {
-                                    setState(() {
-                                      _dueDate = null;
-                                    });
-                                  },
-                                ),
-                              IconButton(
-                                icon: const Icon(Icons.calendar_today),
-                                onPressed: () => _pickDateTime(context),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('Priority'),
-                          subtitle: Row(
-                            children: [
-                              Icon(
-                                Icons.circle,
-                                color: _priority == 0
-                                    ? Colors.green
-                                    : _priority == 1
-                                        ? Colors.orange
-                                        : Colors.red,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _priority == 0
-                                    ? 'Low'
-                                    : _priority == 1
-                                        ? 'Medium'
-                                        : 'High',
-                              ),
-                            ],
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: () async {
-                              int? selectedPriority = _priority;
-                              await showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return StatefulBuilder(
-                                    builder: (context, setStateDialog) {
-                                      return AlertDialog(
-                                        title: const Text('Edit Priority'),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            RadioListTile<int>(
-                                              value: 0,
-                                              groupValue: selectedPriority,
-                                              title: const Text('Low'),
-                                              onChanged: (value) {
-                                                setStateDialog(() {
-                                                  selectedPriority = value;
-                                                });
-                                              },
-                                            ),
-                                            RadioListTile<int>(
-                                              value: 1,
-                                              groupValue: selectedPriority,
-                                              title: const Text('Medium'),
-                                              onChanged: (value) {
-                                                setStateDialog(() {
-                                                  selectedPriority = value;
-                                                });
-                                              },
-                                            ),
-                                            RadioListTile<int>(
-                                              value: 2,
-                                              groupValue: selectedPriority,
-                                              title: const Text('High'),
-                                              onChanged: (value) {
-                                                setStateDialog(() {
-                                                  selectedPriority = value;
-                                                });
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              if (selectedPriority != null) {
-                                                setState(() {
-                                                  _priority = selectedPriority!;
-                                                });
-                                                Navigator.pop(context);
-                                              }
-                                            },
-                                            child: const Text('Save'),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('Location'),
-                          subtitle: Text(_locationName ??
-                              (_location != null
-                                  ? 'Lat: ${_location!.latitude}, Lng: ${_location!.longitude}'
-                                  : 'No location')),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: _pickLocation,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () async {
-                            await _addTask();
-                            await _cleanupUnusedCategories();
-                          },
-                          child: const Text('Add Task'),
-                        ),
-                      ],
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: TextEditingController(),
+                      decoration: const InputDecoration(
+                        labelText: 'New Custom Category',
+                      ),
+                      onSubmitted: (newCat) async {
+                        if (newCat.isNotEmpty && !_categories.contains(newCat)) {
+                          await _addCategory(newCat);
+                          setState(() {
+                            _category = newCat;
+                          });
+                        }
+                      },
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Future<void> _showPriorityDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Priority'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<int>(
+                key: const ValueKey('priority-low'),
+                value: 0,
+                groupValue: _priority,
+                title: const Text('Low'),
+                onChanged: (value) {
+                  setState(() {
+                    _priority = value!;
+                  });
+                },
+              ),
+              RadioListTile<int>(
+                key: const ValueKey('priority-medium'),
+                value: 1,
+                groupValue: _priority,
+                title: const Text('Medium'),
+                onChanged: (value) {
+                  setState(() {
+                    _priority = value!;
+                  });
+                },
+              ),
+              RadioListTile<int>(
+                key: const ValueKey('priority-high'),
+                value: 2,
+                groupValue: _priority,
+                title: const Text('High'),
+                onChanged: (value) {
+                  setState(() {
+                    _priority = value!;
+                  });
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      color: Colors.green[100],
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _isExpanded ? 'Hide Add Task' : 'Add Task',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+                Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+              ],
+            ),
+          ),
+          // ...existing code...
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: const SizedBox.shrink(),
+            secondChild: SizedBox(
+              height: 320,
+              child: Scrollbar(
+                controller: _scrollController,
+                child: ListView(
+                  key: const ValueKey('add-task-form'),
+                  controller: _scrollController,
+                  children: [
+                    TextField(
+                      key: const ValueKey('task-title'),
+                      controller: _controller,
+                      decoration: const InputDecoration(
+                        labelText: 'Task Title',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      key: const ValueKey('category-tile'),
+                      title: const Text('Category'),
+                      subtitle: Text(_category),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _showCategoryDialog(context),
+                      ),
+                    ),
+                    ListTile(
+                      key: const ValueKey('due-date-tile'),
+                      title: const Text('Due Date'),
+                      subtitle: Text(_dueDate != null 
+                        ? _dueDate!.toLocal().toString().split('.')[0] 
+                        : 'No due date'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_dueDate != null)
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                setState(() {
+                                  _dueDate = null;
+                                });
+                              },
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.calendar_today),
+                            onPressed: () => _pickDateTime(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ListTile(
+                      key: const ValueKey('priority-tile'),
+                      title: const Text('Priority'),
+                      subtitle: Row(
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            color: _priority == 0
+                                ? Colors.green
+                                : _priority == 1
+                                    ? Colors.orange
+                                    : Colors.red,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _priority == 0
+                                ? 'Low'
+                                : _priority == 1
+                                    ? 'Medium'
+                                    : 'High',
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => _showPriorityDialog(context),
+                      ),
+                    ),
+                    ListTile(
+                      key: const ValueKey('location-tile'),
+                      title: const Text('Location'),
+                      subtitle: Text(_locationName ??
+                          (_location != null
+                              ? 'Lat: ${_location!.latitude}, Lng: ${_location!.longitude}'
+                              : 'No location')),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: _pickLocation,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      key: const ValueKey('add-task-button'),
+                      onPressed: () async {
+                        await _addTask();
+                        await _cleanupUnusedCategories();
+                      },
+                      child: const Text('Add Task'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
