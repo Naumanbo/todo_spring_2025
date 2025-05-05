@@ -95,15 +95,22 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           DropdownButton<int>(
             value: _selectedThemeIndex,
-            icon: const Icon(Icons.color_lens, color: Colors.white),
-            dropdownColor: Colors.grey[800],
+            icon: Icon(
+              Icons.color_lens,
+              color: _selectedThemeIndex == 1 ? Colors.white : Colors.black,
+            ),
+            dropdownColor: _selectedThemeIndex == 1 ? Colors.grey[800] : Colors.white,
             items: List.generate(
               _themeOptions.length,
-                  (index) => DropdownMenuItem(
+              (index) => DropdownMenuItem(
                 value: index,
                 child: Text(
                   _themeOptions[index],
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(
+                    // All text items will be white when dark theme is selected,
+                    // black for all other themes
+                    color: _selectedThemeIndex == 1 ? Colors.white : Colors.black,
+                  ),
                 ),
               ),
             ),
