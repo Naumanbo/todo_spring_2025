@@ -332,8 +332,8 @@ class _DetailScreenState extends State<DetailScreen> {
           return Text('Error: ${snapshot.error}');
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const CircularProgressIndicator();
+        if (!snapshot.hasData) {
+          return const SizedBox();
         }
 
         final data = snapshot.data?.data() as Map<String, dynamic>?;
@@ -366,24 +366,24 @@ class _DetailScreenState extends State<DetailScreen> {
                 ],
               ),
               Expanded(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: subtasks.asMap().entries.map((entry) {
-                    final int index = entry.key;
-                    final subtask = entry.value;
+                child: ListView.builder(
+                  key: const PageStorageKey('subtasks_list'),
+                  itemCount: subtasks.length,
+                  itemBuilder: (context, index) {
+                    final subtask = subtasks[index];
                     final completedAt = subtask.completedAt;
                     return Row(
                       children: [
                         Expanded(
                           child: CheckboxListTile(
                             value: completedAt != null,
-                            onChanged: (bool? value) async {
+                            onChanged: (bool? value) {
                               final updatedSubtasks = List<Subtask>.from(subtasks);
                               updatedSubtasks[index] = Subtask(
                                 text: subtask.text,
                                 completedAt: value == true ? DateTime.now() : null,
                               );
-                              await FirebaseFirestore.instance
+                              FirebaseFirestore.instance
                                   .collection('todos')
                                   .doc(widget.todo.id)
                                   .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
@@ -398,9 +398,9 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () async {
+                          onPressed: () {
                             final updatedSubtasks = List<Subtask>.from(subtasks)..removeAt(index);
-                            await FirebaseFirestore.instance
+                            FirebaseFirestore.instance
                                 .collection('todos')
                                 .doc(widget.todo.id)
                                 .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
@@ -408,7 +408,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                       ],
                     );
-                  }).toList(),
+                  },
                 ),
               ),
             ],
