@@ -341,7 +341,13 @@ class _DetailScreenState extends State<DetailScreen> {
 
         final subtasks = (data['subtasks'] as List<dynamic>? ?? [])
             .map((s) => Subtask.fromSnapshot(s as Map<String, dynamic>))
-            .toList();
+            .toList()
+          ..sort((a, b) {
+            if (a.completedAt == null && b.completedAt == null) return 0;
+            if (a.completedAt == null) return 1;
+            if (b.completedAt == null) return -1;
+            return b.completedAt!.compareTo(a.completedAt!);
+          });
 
         return Column(
           mainAxisSize: MainAxisSize.min,
