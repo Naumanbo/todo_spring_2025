@@ -419,15 +419,15 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _showAddSubtaskDialog(List<Subtask> currentSubtasks) async {
-    return showDialog<void>(
+    final TextEditingController controller = TextEditingController();
+    
+    return showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        final TextEditingController controller = TextEditingController();
-        
-        return Dialog(
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: MediaQuery.of(context).viewInsets,
           child: Container(
-            width: 300,
             padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -454,9 +454,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
+                      onPressed: () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 8),
@@ -471,7 +469,7 @@ class _DetailScreenState extends State<DetailScreen> {
                               .doc(widget.todo.id)
                               .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
                         }
-                        Navigator.of(dialogContext).pop();
+                        Navigator.pop(context);
                       },
                       child: const Text('Add'),
                     ),
