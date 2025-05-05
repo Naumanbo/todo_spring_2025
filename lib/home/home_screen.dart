@@ -7,6 +7,7 @@ import '../data/todo.dart';
 import 'details/detail_screen.dart';
 import 'details/location_picker_screen.dart';
 import 'filter/filter_sheet.dart';
+import 'calendar/calendar_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -747,9 +748,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(() => _isAddingTask = !_isAddingTask),
-        child: Icon(_isAddingTask ? Icons.close : Icons.add),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: "calendarBtn",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CalendarScreen()),
+              );
+            },
+            child: const Icon(Icons.calendar_month),
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton(
+            heroTag: "addBtn",
+            onPressed: () => setState(() => _isAddingTask = !_isAddingTask),
+            child: Icon(_isAddingTask ? Icons.close : Icons.add),
+          ),
+        ],
       ),
     );
   }
