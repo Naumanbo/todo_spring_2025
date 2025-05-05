@@ -71,6 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
       filteredTodos.sort((a, b) => _filters.order == 'ascending'
           ? (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0))
           : (b.completedAt ?? DateTime(0)).compareTo(a.completedAt ?? DateTime(0)));
+    } else if (_filters.sortBy == 'priority') {
+      filteredTodos.sort((a, b) => _filters.order == 'ascending' ? a.priority.compareTo(b.priority) : b.priority.compareTo(a.priority));
     }
 
     return filteredTodos;
@@ -183,14 +185,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               final todo = _filteredTodos?[index];
                               if (todo == null) return const SizedBox.shrink();
                               return ListTile(
-                                leading: Checkbox(
-                                  value: todo.completedAt != null,
-                                  onChanged: (bool? value) {
-                                    final updateData = {
-                                      'completedAt': value == true ? FieldValue.serverTimestamp() : null
-                                    };
-                                    FirebaseFirestore.instance.collection('todos').doc(todo.id).update(updateData);
-                                  },
+                                leading: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      color: todo.priority == 0
+                                          ? Colors.green
+                                          : todo.priority == 1
+                                          ? Colors.orange
+                                          : Colors.red,
+                                      size: 12,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Checkbox(
+                                      value: todo.completedAt != null,
+                                      onChanged: (bool? value) {
+                                        final updateData = {
+                                          'completedAt': value == true ? FieldValue.serverTimestamp() : null
+                                        };
+                                        FirebaseFirestore.instance.collection('todos').doc(todo.id).update(updateData);
+                                      },
+                                    ),
+                                  ],
                                 ),
                                 trailing: Icon(Icons.arrow_forward_ios),
                                 title: Text(

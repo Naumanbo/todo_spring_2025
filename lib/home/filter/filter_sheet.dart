@@ -50,6 +50,7 @@ class _FilterSheetState extends State<FilterSheet> {
                   items: const [
                     DropdownMenuItem(value: 'date', child: Text('Date')),
                     DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                    DropdownMenuItem(value: 'priority', child: Text('Priority')),
                   ],
                   onChanged: (value) {
                     setState(() {
