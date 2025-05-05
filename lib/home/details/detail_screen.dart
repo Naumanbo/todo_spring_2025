@@ -343,76 +343,72 @@ class _DetailScreenState extends State<DetailScreen> {
             .map((s) => Subtask.fromSnapshot(s as Map<String, dynamic>))
             .toList();
 
-        return SizedBox(
-          height: 250,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Subtasks',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Subtasks',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: () => _showAddSubtaskDialog(subtasks),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: ListView.builder(
-                  key: const PageStorageKey('subtasks_list'),
-                  itemCount: subtasks.length,
-                  itemBuilder: (context, index) {
-                    final subtask = subtasks[index];
-                    final completedAt = subtask.completedAt;
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: CheckboxListTile(
-                            value: completedAt != null,
-                            onChanged: (bool? value) {
-                              final updatedSubtasks = List<Subtask>.from(subtasks);
-                              updatedSubtasks[index] = Subtask(
-                                text: subtask.text,
-                                completedAt: value == true ? DateTime.now() : null,
-                              );
-                              FirebaseFirestore.instance
-                                  .collection('todos')
-                                  .doc(widget.todo.id)
-                                  .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
-                            },
-                            title: Text(
-                              subtask.text,
-                              style: completedAt != null
-                                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            final updatedSubtasks = List<Subtask>.from(subtasks)..removeAt(index);
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddSubtaskDialog(subtasks),
+                ),
+              ],
+            ),
+            Column(
+              children: List.generate(
+                subtasks.length,
+                (index) {
+                  final subtask = subtasks[index];
+                  final completedAt = subtask.completedAt;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: CheckboxListTile(
+                          value: completedAt != null,
+                          onChanged: (bool? value) {
+                            final updatedSubtasks = List<Subtask>.from(subtasks);
+                            updatedSubtasks[index] = Subtask(
+                              text: subtask.text,
+                              completedAt: value == true ? DateTime.now() : null,
+                            );
                             FirebaseFirestore.instance
                                 .collection('todos')
                                 .doc(widget.todo.id)
                                 .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
                           },
+                          title: Text(
+                            subtask.text,
+                            style: completedAt != null
+                                ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                : null,
+                          ),
                         ),
-                      ],
-                    );
-                  },
-                ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          final updatedSubtasks = List<Subtask>.from(subtasks)..removeAt(index);
+                          FirebaseFirestore.instance
+                              .collection('todos')
+                              .doc(widget.todo.id)
+                              .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -528,341 +524,343 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _textController,
-              decoration: const InputDecoration(
-                border: UnderlineInputBorder(),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 32.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _textController,
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(),
+                ),
+                onSubmitted: (newText) async {
+                  if (newText.isNotEmpty && newText != widget.todo.text) {
+                    await _updateText(newText);
+                  }
+                },
               ),
-              onSubmitted: (newText) async {
-                if (newText.isNotEmpty && newText != widget.todo.text) {
-                  await _updateText(newText);
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('Due Date'),
-              subtitle: Text(
-                  _selectedDueDate?.toLocal().toString().split('.')[0] ??
-                      'No due date'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_selectedDueDate != null)
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Due Date'),
+                subtitle: Text(
+                    _selectedDueDate?.toLocal().toString().split('.')[0] ??
+                        'No due date'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_selectedDueDate != null)
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () async {
+                          _updateDueDate(null);
+                          setState(() {
+                            _selectedDueDate = null;
+                          });
+                        },
+                      ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.calendar_today),
                       onPressed: () async {
-                        _updateDueDate(null);
+                        final isGranted = await _requestNotificationPermission();
+                        if (!context.mounted) return;
+
+                        if (!isGranted) {
+                          _showPermissionDeniedSnackbar(context);
+                          return;
+                        }
+
+                        await _initializeNotifications();
+                        if (!context.mounted) return;
+
+                        final selectedDate = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDueDate ?? DateTime.now(),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime(2050),
+                        );
+                        if (!context.mounted) return;
+                        if (selectedDate == null) return;
+
+                        final selectedTime = await showTimePicker(
+                          context: context,
+                          initialTime: _selectedDueDate != null
+                              ? TimeOfDay.fromDateTime(_selectedDueDate!)
+                              : TimeOfDay.now(),
+                        );
+                        if (selectedTime == null) return;
+
+                        final DateTime dueDate = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+
                         setState(() {
-                          _selectedDueDate = null;
+                          _selectedDueDate = dueDate;
                         });
+
+                        await _updateDueDate(dueDate);
+                        await _scheduleNotification(
+                          widget.todo.id,
+                          dueDate,
+                          widget.todo.text,
+                        );
                       },
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () async {
-                      final isGranted = await _requestNotificationPermission();
-                      if (!context.mounted) return;
-
-                      if (!isGranted) {
-                        _showPermissionDeniedSnackbar(context);
-                        return;
-                      }
-
-                      await _initializeNotifications();
-                      if (!context.mounted) return;
-
-                      final selectedDate = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDueDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2050),
-                      );
-                      if (!context.mounted) return;
-                      if (selectedDate == null) return;
-
-                      final selectedTime = await showTimePicker(
-                        context: context,
-                        initialTime: _selectedDueDate != null
-                            ? TimeOfDay.fromDateTime(_selectedDueDate!)
-                            : TimeOfDay.now(),
-                      );
-                      if (selectedTime == null) return;
-
-                      final DateTime dueDate = DateTime(
-                        selectedDate.year,
-                        selectedDate.month,
-                        selectedDate.day,
-                        selectedTime.hour,
-                        selectedTime.minute,
-                      );
-
-                      setState(() {
-                        _selectedDueDate = dueDate;
-                      });
-
-                      await _updateDueDate(dueDate);
-                      await _scheduleNotification(
-                        widget.todo.id,
-                        dueDate,
-                        widget.todo.text,
-                      );
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('Category'),
-              subtitle: Text(widget.todo.category),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () async {
-                  final categories = await fetchCategories();
-                  String? selectedCategory = widget.todo.category;
-                  await showDialog(
-                    context: context,
-                    builder: (context) {
-                      return StatefulBuilder(
-                        builder: (context, setState) {
-                          final TextEditingController newCategoryController =
-                              TextEditingController();
-                          return AlertDialog(
-                            title: const Text('Edit Category'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: DropdownButton<String>(
-                                        value: selectedCategory,
-                                        isExpanded: true,
-                                        items: categories.map((category) {
-                                          return DropdownMenuItem(
-                                            value: category,
-                                            child: Text(category),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            selectedCategory = value;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                    if (selectedCategory != null &&
-                                        !defaultCategories
-                                            .contains(selectedCategory))
-                                      IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: () async {
-                                          final confirm =
-                                              await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title:
-                                                  const Text('Delete Category'),
-                                              content: Text(
-                                                  'Are you sure you want to delete "$selectedCategory"?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                          context, false),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                          context, true),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true &&
-                                              selectedCategory != null) {
-                                            await _removeCategory(
-                                                selectedCategory!);
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Category'),
+                subtitle: Text(widget.todo.category),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    final categories = await fetchCategories();
+                    String? selectedCategory = widget.todo.category;
+                    await showDialog(
+                      context: context,
+                      builder: (context) {
+                        return StatefulBuilder(
+                          builder: (context, setState) {
+                            final TextEditingController newCategoryController =
+                                TextEditingController();
+                            return AlertDialog(
+                              title: const Text('Edit Category'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButton<String>(
+                                          value: selectedCategory,
+                                          isExpanded: true,
+                                          items: categories.map((category) {
+                                            return DropdownMenuItem(
+                                              value: category,
+                                              child: Text(category),
+                                            );
+                                          }).toList(),
+                                          onChanged: (value) {
                                             setState(() {
-                                              categories
-                                                  .remove(selectedCategory);
-                                              selectedCategory =
-                                                  categories.isNotEmpty
-                                                      ? categories.first
-                                                      : null;
+                                              selectedCategory = value;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      if (selectedCategory != null &&
+                                          !defaultCategories
+                                              .contains(selectedCategory))
+                                        IconButton(
+                                          icon: const Icon(Icons.delete),
+                                          onPressed: () async {
+                                            final confirm =
+                                                await showDialog<bool>(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title:
+                                                    const Text('Delete Category'),
+                                                content: Text(
+                                                    'Are you sure you want to delete "$selectedCategory"?'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            context, false),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            context, true),
+                                                    child: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            if (confirm == true &&
+                                                selectedCategory != null) {
+                                              await _removeCategory(
+                                                  selectedCategory!);
+                                              setState(() {
+                                                categories
+                                                    .remove(selectedCategory);
+                                                selectedCategory =
+                                                    categories.isNotEmpty
+                                                        ? categories.first
+                                                        : null;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: newCategoryController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'New Custom Category',
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add),
+                                        onPressed: () async {
+                                          final newCat =
+                                              newCategoryController.text.trim();
+                                          if (newCat.isNotEmpty &&
+                                              !categories.contains(newCat)) {
+                                            await addCategory(newCat);
+                                            setState(() {
+                                              categories.add(newCat);
+                                              selectedCategory = newCat;
+                                              newCategoryController.clear();
                                             });
                                           }
                                         },
                                       ),
-                                  ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
                                 ),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: newCategoryController,
-                                        decoration: const InputDecoration(
-                                          labelText: 'New Custom Category',
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () async {
-                                        final newCat =
-                                            newCategoryController.text.trim();
-                                        if (newCat.isNotEmpty &&
-                                            !categories.contains(newCat)) {
-                                          await addCategory(newCat);
-                                          setState(() {
-                                            categories.add(newCat);
-                                            selectedCategory = newCat;
-                                            newCategoryController.clear();
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ],
+                                TextButton(
+                                  onPressed: () async {
+                                    if (selectedCategory != null) {
+                                      await _updateCategory(selectedCategory!);
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                  child: const Text('Save'),
                                 ),
                               ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  if (selectedCategory != null) {
-                                    await _updateCategory(selectedCategory!);
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                child: const Text('Save'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-            ListTile(
-              title: const Text('Priority'),
-              subtitle: Row(
-                children: [
-                  Icon(
-                    Icons.circle,
-                    color: _priority == 0
-                        ? Colors.green
-                        : _priority == 1
-                            ? Colors.orange
-                            : Colors.red,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _priority == 0
-                        ? 'Low'
-                        : _priority == 1
-                            ? 'Medium'
-                            : 'High',
-                  ),
-                ],
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () async {
-                  int? selectedPriority = _priority;
-                  await showDialog(
-                    context: context,
-                    builder: (context) {
-                      return StatefulBuilder(
-                        builder: (context, setState) {
-                          return AlertDialog(
-                            title: const Text('Edit Priority'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                RadioListTile<int>(
-                                  value: 0,
-                                  groupValue: selectedPriority,
-                                  title: const Text('Low'),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedPriority = value;
-                                    });
-                                  },
+              ListTile(
+                title: const Text('Priority'),
+                subtitle: Row(
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      color: _priority == 0
+                          ? Colors.green
+                          : _priority == 1
+                              ? Colors.orange
+                              : Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _priority == 0
+                          ? 'Low'
+                          : _priority == 1
+                              ? 'Medium'
+                              : 'High',
+                    ),
+                  ],
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    int? selectedPriority = _priority;
+                    await showDialog(
+                      context: context,
+                      builder: (context) {
+                        return StatefulBuilder(
+                          builder: (context, setState) {
+                            return AlertDialog(
+                              title: const Text('Edit Priority'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  RadioListTile<int>(
+                                    value: 0,
+                                    groupValue: selectedPriority,
+                                    title: const Text('Low'),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPriority = value;
+                                      });
+                                    },
+                                  ),
+                                  RadioListTile<int>(
+                                    value: 1,
+                                    groupValue: selectedPriority,
+                                    title: const Text('Medium'),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPriority = value;
+                                      });
+                                    },
+                                  ),
+                                  RadioListTile<int>(
+                                    value: 2,
+                                    groupValue: selectedPriority,
+                                    title: const Text('High'),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPriority = value;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
                                 ),
-                                RadioListTile<int>(
-                                  value: 1,
-                                  groupValue: selectedPriority,
-                                  title: const Text('Medium'),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedPriority = value;
-                                    });
+                                TextButton(
+                                  onPressed: () async {
+                                    if (selectedPriority != null) {
+                                      await _updatePriority(selectedPriority!);
+                                      Navigator.pop(context);
+                                    }
                                   },
-                                ),
-                                RadioListTile<int>(
-                                  value: 2,
-                                  groupValue: selectedPriority,
-                                  title: const Text('High'),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedPriority = value;
-                                    });
-                                  },
+                                  child: const Text('Save'),
                                 ),
                               ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  if (selectedPriority != null) {
-                                    await _updatePriority(selectedPriority!);
-                                    Navigator.pop(context);
-                                  }
-                                },
-                                child: const Text('Save'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-            ListTile(
-              title: const Text('Location'),
-              subtitle: Text(_selectedLocationName ??
-                  (_selectedLocation != null
-                      ? 'Lat: ${_selectedLocation!.latitude}, Lng: ${_selectedLocation!.longitude}'
-                      : 'No location')),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: _pickLocation,
+              ListTile(
+                title: const Text('Location'),
+                subtitle: Text(_selectedLocationName ??
+                    (_selectedLocation != null
+                        ? 'Lat: ${_selectedLocation!.latitude}, Lng: ${_selectedLocation!.longitude}'
+                        : 'No location')),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: _pickLocation,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildSubtasksList(),
-          ],
+              const SizedBox(height: 16),
+              _buildSubtasksList(),
+            ],
+          ),
         ),
       ),
     );
