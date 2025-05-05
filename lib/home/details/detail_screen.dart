@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:latlong2/latlong.dart';
 import '../../data/todo.dart';
+import 'location_picker_screen.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -22,6 +24,8 @@ class _DetailScreenState extends State<DetailScreen> {
   late TextEditingController _textController;
   late int _priority;
   DateTime? _selectedDueDate;
+  GeoPoint? _selectedLocation;
+  String? _selectedLocationName;
 
   @override
   void initState() {
@@ -29,6 +33,57 @@ class _DetailScreenState extends State<DetailScreen> {
     _textController = TextEditingController(text: widget.todo.text);
     _selectedDueDate = widget.todo.dueAt;
     _priority = widget.todo.priority;
+    _selectedLocation = widget.todo.location;
+  }
+
+  Future<void> _updateLocation(GeoPoint? newLocation, String? locationName) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .update({
+        'location': newLocation != null
+            ? GeoPoint(newLocation.latitude, newLocation.longitude)
+            : null,
+        'locationName': locationName, // Update locationName
+      });
+      setState(() {
+        _selectedLocation = newLocation;
+        _selectedLocationName = locationName;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update location: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationPickerScreen(
+          initialLocation: _selectedLocation != null
+              ? LatLng(_selectedLocation!.latitude, _selectedLocation!.longitude)
+              : null,
+        ),
+      ),
+    );
+
+    if (result != null && result['location'] != null) {
+      final LatLng pickedLocation = result['location'];
+      final String? locationName = result['name'];
+
+      final newLocation = GeoPoint(pickedLocation.latitude, pickedLocation.longitude);
+      await _updateLocation(newLocation, locationName);
+
+      setState(() {
+        _selectedLocation = newLocation;
+        _selectedLocationName = locationName ?? 'Lat: ${pickedLocation.latitude}, Lng: ${pickedLocation.longitude}';
+      });
+    }
   }
 
   Future<void> _updatePriority(int newPriority) async {
@@ -378,7 +433,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     builder: (context) {
                       return StatefulBuilder(
                         builder: (context, setState) {
-                          final TextEditingController _newCategoryController = TextEditingController();
+                          final TextEditingController _newCategoryController =
+                              TextEditingController();
                           return AlertDialog(
                             title: const Text('Edit Category'),
                             content: Column(
@@ -404,37 +460,46 @@ class _DetailScreenState extends State<DetailScreen> {
                                       ),
                                     ),
                                     if (selectedCategory != null &&
-                                        !defaultCategories.contains(selectedCategory))
+                                        !defaultCategories
+                                            .contains(selectedCategory))
                                       IconButton(
                                         icon: const Icon(Icons.delete),
                                         onPressed: () async {
-                                          final confirm = await showDialog<bool>(
+                                          final confirm =
+                                              await showDialog<bool>(
                                             context: context,
                                             builder: (context) => AlertDialog(
-                                              title: const Text('Delete Category'),
+                                              title:
+                                                  const Text('Delete Category'),
                                               content: Text(
                                                   'Are you sure you want to delete "$selectedCategory"?'),
                                               actions: [
                                                 TextButton(
                                                   onPressed: () =>
-                                                      Navigator.pop(context, false),
+                                                      Navigator.pop(
+                                                          context, false),
                                                   child: const Text('Cancel'),
                                                 ),
                                                 TextButton(
                                                   onPressed: () =>
-                                                      Navigator.pop(context, true),
+                                                      Navigator.pop(
+                                                          context, true),
                                                   child: const Text('Delete'),
                                                 ),
                                               ],
                                             ),
                                           );
-                                          if (confirm == true && selectedCategory != null) {
-                                            await _removeCategory(selectedCategory!);
+                                          if (confirm == true &&
+                                              selectedCategory != null) {
+                                            await _removeCategory(
+                                                selectedCategory!);
                                             setState(() {
-                                              categories.remove(selectedCategory);
-                                              selectedCategory = categories.isNotEmpty
-                                                  ? categories.first
-                                                  : null;
+                                              categories
+                                                  .remove(selectedCategory);
+                                              selectedCategory =
+                                                  categories.isNotEmpty
+                                                      ? categories.first
+                                                      : null;
                                             });
                                           }
                                         },
@@ -454,8 +519,10 @@ class _DetailScreenState extends State<DetailScreen> {
                                     IconButton(
                                       icon: const Icon(Icons.add),
                                       onPressed: () async {
-                                        final newCat = _newCategoryController.text.trim();
-                                        if (newCat.isNotEmpty && !categories.contains(newCat)) {
+                                        final newCat =
+                                            _newCategoryController.text.trim();
+                                        if (newCat.isNotEmpty &&
+                                            !categories.contains(newCat)) {
                                           await addCategory(newCat);
                                           setState(() {
                                             categories.add(newCat);
@@ -501,8 +568,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     color: _priority == 0
                         ? Colors.green
                         : _priority == 1
-                        ? Colors.orange
-                        : Colors.red,
+                            ? Colors.orange
+                            : Colors.red,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -510,8 +577,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     _priority == 0
                         ? 'Low'
                         : _priority == 1
-                        ? 'Medium'
-                        : 'High',
+                            ? 'Medium'
+                            : 'High',
                   ),
                 ],
               ),
@@ -584,10 +651,20 @@ class _DetailScreenState extends State<DetailScreen> {
                 },
               ),
             ),
+            ListTile(
+              title: const Text('Location'),
+              subtitle: Text(_selectedLocationName ??
+                  (_selectedLocation != null
+                      ? 'Lat: ${_selectedLocation!.latitude}, Lng: ${_selectedLocation!.longitude}'
+                      : 'No location')),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: _pickLocation,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

@@ -8,6 +8,7 @@ class Todo {
   final DateTime? completedAt;
   final DateTime? dueAt;
   final GeoPoint? location;
+  final String? locationName;
   final String category;
   final List<Subtask> subtasks;
   final int priority;
@@ -20,6 +21,7 @@ class Todo {
     required this.completedAt,
     required this.dueAt,
     required this.location,
+    required this.locationName,
     required this.category,
     required this.subtasks,
     required this.priority,
@@ -33,6 +35,7 @@ class Todo {
       'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
       'dueAt': dueAt != null ? Timestamp.fromDate(dueAt!) : null,
       'location': location,
+      'locationName': locationName,
       'category': category,
       'subtasks': subtasks.map((subtask) => subtask.toSnapshot()).toList(),
       'priority': priority,
@@ -49,6 +52,7 @@ class Todo {
       completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
       dueAt: data['dueAt'] != null ? (data['dueAt'] as Timestamp).toDate() : null,
       location: data['location'] != null ? data['location'] as GeoPoint : null,
+      locationName: data['locationName'],
       category: data['category'] ?? 'None',
       subtasks: (data['subtasks'] as List<dynamic>? ?? [])
           .map((subtaskData) => Subtask.fromSnapshot(subtaskData as Map<String, dynamic>))
