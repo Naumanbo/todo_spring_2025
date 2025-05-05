@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:todo_spring_2025/router/router_screen.dart';
+import 'package:todo_spring_2025/home/home_screen.dart'; // Add this import
 import 'firebase_options.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -75,6 +76,7 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp(
           title: 'TODO Spring 2025',
           theme: _themes[themeIndex],
+          navigatorObservers: [routeObserver],
           home: RouterScreen(
             onThemeChanged: (index) {
               _themeIndex.value = index;

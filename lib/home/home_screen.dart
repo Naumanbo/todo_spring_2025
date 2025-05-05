@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../data/todo.dart';
 import 'details/detail_screen.dart';
+import 'details/location_picker_screen.dart';
 import 'filter/filter_sheet.dart';
+
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 class HomeScreen extends StatefulWidget {
   final Function(int) onThemeChanged;
@@ -17,7 +21,7 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final List<String> _themeOptions = [
     'Light Theme',
     'Dark Theme',
@@ -27,7 +31,6 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   int _selectedThemeIndex = 0;
-  final _controller = TextEditingController();
   final _searchController = TextEditingController();
   String _searchText = '';
   FilterSheetResult _filters = FilterSheetResult(
@@ -36,8 +39,12 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   void dispose() {
-    _controller.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -59,6 +66,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return filteredTodos;
+  }
+
+  Widget _buildAddTaskSection(BuildContext context, User user) {
+    return AddTaskForm(
+      user: user,
+      onTaskAdded: () async {
+        // This callback will be called after a task is added
+        // No need to do anything here as StreamBuilder will handle updates
+      },
+    );
   }
 
   @override
@@ -211,44 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               ),
                       ),
-                      Container(
-                        color: Colors.green[100],
-                        padding: const EdgeInsets.all(32.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _controller,
-                                decoration: const InputDecoration(
-                                  labelText: 'Enter Task:',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () async {
-                                if (user != null && _controller.text.isNotEmpty) {
-                                  await FirebaseFirestore.instance.collection('todos').add({
-                                    'text': _controller.text,
-                                    'createdAt': FieldValue.serverTimestamp(),
-                                    'uid': user.uid,
-                                    'category': 'None',
-                                    'dueAt': null,
-                                    'location': null,
-                                    'locationName': null,
-                                    'priority': 0,
-                                    'completedAt': null,
-                                    'subtasks': [],
-                                  });
-                                  _controller.clear();
-                                }
-                              },
-                              child: const Text('Add'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildAddTaskSection(context, user!),
                     ],
                   ),
                 ),
@@ -257,6 +237,497 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class AddTaskForm extends StatefulWidget {
+  final User user;
+  final VoidCallback onTaskAdded;
+
+  const AddTaskForm({
+    Key? key,
+    required this.user,
+    required this.onTaskAdded,
+  }) : super(key: key);
+
+  @override
+  State<AddTaskForm> createState() => _AddTaskFormState();
+}
+
+class _AddTaskFormState extends State<AddTaskForm> with RouteAware {
+  final _controller = TextEditingController();
+  bool _isExpanded = false;
+  String _category = 'None';
+  DateTime? _dueDate;
+  int _priority = 0;
+  GeoPoint? _location;
+  String? _locationName;
+  List<String> _categories = ['None', 'Home', 'Work', 'School'];
+  final ScrollController _scrollController = ScrollController();
+  StreamSubscription<QuerySnapshot>? _categoriesSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupCategoriesListener();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    _controller.dispose();
+    _scrollController.dispose();
+    _categoriesSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Reset form when returning from detail screen
+    _resetForm();
+  }
+
+  void _resetForm() {
+    _controller.clear();
+    setState(() {
+      _category = 'None';
+      _dueDate = null;
+      _priority = 0;
+      _location = null;
+      _locationName = null;
+    });
+  }
+
+  void _setupCategoriesListener() {
+    _categoriesSubscription = FirebaseFirestore.instance
+        .collection('categories')
+        .snapshots()
+        .listen((snapshot) {
+      final customCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
+      if (mounted) {
+        setState(() {
+          _categories = ['None', 'Home', 'Work', 'School', ...customCategories];
+        });
+      }
+    });
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationPickerScreen(
+          initialLocation: _location != null
+              ? LatLng(_location!.latitude, _location!.longitude)
+              : null,
+        ),
+      ),
+    );
+    if (result != null && result['location'] != null) {
+      final LatLng pickedLocation = result['location'];
+      final String? locationName = result['name'];
+      setState(() {
+        _location = GeoPoint(pickedLocation.latitude, pickedLocation.longitude);
+        _locationName = locationName ?? 'Lat: ${pickedLocation.latitude}, Lng: ${pickedLocation.longitude}';
+      });
+    }
+  }
+
+  Future<void> _pickDateTime(BuildContext context) async {
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2050),
+    );
+    
+    if (selectedDate != null && mounted) {
+      final TimeOfDay? selectedTime = await showTimePicker(
+        context: context,
+        initialTime: _dueDate != null
+            ? TimeOfDay.fromDateTime(_dueDate!)
+            : TimeOfDay.now(),
+      );
+      
+      if (selectedTime != null && mounted) {
+        setState(() {
+          _dueDate = DateTime(
+            selectedDate.year,
+            selectedDate.month,
+            selectedDate.day,
+            selectedTime.hour,
+            selectedTime.minute,
+          );
+        });
+      }
+    }
+  }
+
+  Future<void> _addCategory(String categoryName) async {
+    try {
+      // First check if category already exists
+      final existingCategories = await FirebaseFirestore.instance
+          .collection('categories')
+          .where('name', isEqualTo: categoryName)
+          .get();
+      
+      if (existingCategories.docs.isEmpty) {
+        await FirebaseFirestore.instance
+            .collection('categories')
+            .add({'name': categoryName});
+      }
+      
+      setState(() {
+        if (!_categories.contains(categoryName)) {
+          _categories.add(categoryName);
+        }
+        _category = categoryName;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add category: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addTask() async {
+    if (widget.user != null && _controller.text.isNotEmpty) {
+      await FirebaseFirestore.instance.collection('todos').add({
+        'text': _controller.text,
+        'createdAt': FieldValue.serverTimestamp(),
+        'uid': widget.user.uid,
+        'category': _category,  // Use the selected category
+        'dueAt': _dueDate != null ? Timestamp.fromDate(_dueDate!) : null,
+        'location': _location,
+        'locationName': _locationName,
+        'priority': _priority,
+        'completedAt': null,
+        'subtasks': [],
+      });
+      _resetForm();
+      widget.onTaskAdded();
+    }
+  }
+
+  Future<void> _cleanupUnusedCategories() async {
+    const defaultCategories = ['None', 'Home', 'Work', 'School'];
+    final categoriesSnapshot = await FirebaseFirestore.instance.collection('categories').get();
+    
+    for (var categoryDoc in categoriesSnapshot.docs) {
+      final categoryName = categoryDoc['name'] as String;
+      if (!defaultCategories.contains(categoryName)) {
+        // Check if any todos use this category
+        final todosWithCategory = await FirebaseFirestore.instance
+            .collection('todos')
+            .where('category', isEqualTo: categoryName)
+            .get();
+            
+        if (todosWithCategory.docs.isEmpty) {
+          // If no todos use this category, delete it
+          await categoryDoc.reference.delete();
+        }
+      }
+    }
+    await _fetchCategories(); // Refresh categories list
+  }
+
+  Future<void> _fetchCategories() async {
+    final snapshot = await FirebaseFirestore.instance.collection('categories').get();
+    final customCategories = snapshot.docs.map((doc) => doc['name'] as String).toList();
+    if (mounted) {
+      setState(() {
+        _categories = ['None', 'Home', 'Work', 'School', ...customCategories];
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StatefulBuilder(
+      builder: (context, setAddTaskState) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          color: Colors.green[100],
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setAddTaskState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isExpanded ? 'Hide Add Task' : 'Add Task',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                    ),
+                    Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                  ],
+                ),
+              ),
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 300),
+                crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                firstChild: const SizedBox.shrink(),
+                secondChild: SizedBox(
+                  height: 320,
+                  child: Scrollbar(
+                    controller: _scrollController,
+                    child: ListView(
+                      controller: _scrollController,
+                      children: [
+                        TextField(
+                          controller: _controller,
+                          decoration: const InputDecoration(
+                            labelText: 'Task Title',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ListTile(
+                          title: const Text('Category'),
+                          subtitle: Text(_category),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () async {
+                              String selectedCategory = _category;
+                              final TextEditingController newCategoryController = TextEditingController();
+                              
+                              await showDialog(
+                                context: context,
+                                builder: (dialogContext) {
+                                  return StatefulBuilder(
+                                    builder: (context, setStateDialog) {
+                                      return AlertDialog(
+                                        title: const Text('Edit Category'),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            DropdownButton<String>(
+                                              value: selectedCategory,
+                                              isExpanded: true,
+                                              items: _categories.map((category) {
+                                                return DropdownMenuItem(
+                                                  value: category,
+                                                  child: Text(category),
+                                                );
+                                              }).toList(),
+                                              onChanged: (value) {
+                                                setStateDialog(() {
+                                                  selectedCategory = value!;
+                                                });
+                                              },
+                                            ),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: newCategoryController,
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'New Custom Category',
+                                                    ),
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.add),
+                                                  onPressed: () async {
+                                                    final newCat = newCategoryController.text.trim();
+                                                    if (newCat.isNotEmpty && !_categories.contains(newCat)) {
+                                                      await _addCategory(newCat);
+                                                      setStateDialog(() {
+                                                        selectedCategory = newCat;
+                                                      });
+                                                      newCategoryController.clear();
+                                                    }
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              setState(() {
+                                                _category = selectedCategory;
+                                              });
+                                            },
+                                            child: const Text('Save'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        ListTile(
+                          title: const Text('Due Date'),
+                          subtitle: Text(_dueDate != null 
+                            ? _dueDate!.toLocal().toString().split('.')[0] 
+                            : 'No due date'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_dueDate != null)
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () {
+                                    setState(() {
+                                      _dueDate = null;
+                                    });
+                                  },
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.calendar_today),
+                                onPressed: () => _pickDateTime(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ListTile(
+                          title: const Text('Priority'),
+                          subtitle: Row(
+                            children: [
+                              Icon(
+                                Icons.circle,
+                                color: _priority == 0
+                                    ? Colors.green
+                                    : _priority == 1
+                                        ? Colors.orange
+                                        : Colors.red,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _priority == 0
+                                    ? 'Low'
+                                    : _priority == 1
+                                        ? 'Medium'
+                                        : 'High',
+                              ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () async {
+                              int? selectedPriority = _priority;
+                              await showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return StatefulBuilder(
+                                    builder: (context, setStateDialog) {
+                                      return AlertDialog(
+                                        title: const Text('Edit Priority'),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            RadioListTile<int>(
+                                              value: 0,
+                                              groupValue: selectedPriority,
+                                              title: const Text('Low'),
+                                              onChanged: (value) {
+                                                setStateDialog(() {
+                                                  selectedPriority = value;
+                                                });
+                                              },
+                                            ),
+                                            RadioListTile<int>(
+                                              value: 1,
+                                              groupValue: selectedPriority,
+                                              title: const Text('Medium'),
+                                              onChanged: (value) {
+                                                setStateDialog(() {
+                                                  selectedPriority = value;
+                                                });
+                                              },
+                                            ),
+                                            RadioListTile<int>(
+                                              value: 2,
+                                              groupValue: selectedPriority,
+                                              title: const Text('High'),
+                                              onChanged: (value) {
+                                                setStateDialog(() {
+                                                  selectedPriority = value;
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              if (selectedPriority != null) {
+                                                setState(() {
+                                                  _priority = selectedPriority!;
+                                                });
+                                                Navigator.pop(context);
+                                              }
+                                            },
+                                            child: const Text('Save'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        ListTile(
+                          title: const Text('Location'),
+                          subtitle: Text(_locationName ??
+                              (_location != null
+                                  ? 'Lat: ${_location!.latitude}, Lng: ${_location!.longitude}'
+                                  : 'No location')),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: _pickLocation,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await _addTask();
+                            await _cleanupUnusedCategories();
+                          },
+                          child: const Text('Add Task'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
