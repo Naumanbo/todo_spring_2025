@@ -623,18 +623,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                   final data = doc.data();
                                   if (data != null && data['subtasks'] != null) {
                                     final List<dynamic> subtasks = data['subtasks'];
-                                    // Update all subtasks completion status
-                                    final updatedSubtasks = subtasks.map((s) {
-                                      final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
-                                      subtask['completedAt'] = value == true ? Timestamp.now() : null;
-                                      return subtask;
-                                    }).toList();
                                     
-                                    // Update both the main task and all subtasks
-                                    await todoRef.update({
-                                      'completedAt': timestamp,
-                                      'subtasks': updatedSubtasks,
-                                    });
+                                    if (value == true) {
+                                      // When marking as complete, mark all subtasks as complete
+                                      final updatedSubtasks = subtasks.map((s) {
+                                        final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                        subtask['completedAt'] = timestamp;
+                                        return subtask;
+                                      }).toList();
+                                      
+                                      await todoRef.update({
+                                        'completedAt': timestamp,
+                                        'subtasks': updatedSubtasks,
+                                      });
+                                    } else {
+                                      // When unchecking, uncheck all subtasks
+                                      final updatedSubtasks = subtasks.map((s) {
+                                        final Map<String, dynamic> subtask = Map<String, dynamic>.from(s);
+                                        subtask['completedAt'] = null;
+                                        return subtask;
+                                      }).toList();
+                                      
+                                      await todoRef.update({
+                                        'completedAt': null,
+                                        'subtasks': updatedSubtasks,
+                                      });
+                                    }
                                   } else {
                                     // If no subtasks, just update the main task
                                     await todoRef.update({
