@@ -322,43 +322,166 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _buildSubtasksList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Subtasks',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('todos')
+          .doc(widget.todo.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
+        }
+
+        final data = snapshot.data?.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox();
+
+        final subtasks = (data['subtasks'] as List<dynamic>? ?? [])
+            .map((s) => Subtask.fromSnapshot(s as Map<String, dynamic>))
+            .toList();
+
+        return SizedBox(
+          height: 250,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Subtasks',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () => _showAddSubtaskDialog(subtasks),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: subtasks.asMap().entries.map((entry) {
+                    final int index = entry.key;
+                    final subtask = entry.value;
+                    final completedAt = subtask.completedAt;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: CheckboxListTile(
+                            value: completedAt != null,
+                            onChanged: (bool? value) async {
+                              final updatedSubtasks = List<Subtask>.from(subtasks);
+                              updatedSubtasks[index] = Subtask(
+                                text: subtask.text,
+                                completedAt: value == true ? DateTime.now() : null,
+                              );
+                              await FirebaseFirestore.instance
+                                  .collection('todos')
+                                  .doc(widget.todo.id)
+                                  .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+                            },
+                            title: Text(
+                              subtask.text,
+                              style: completedAt != null
+                                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () async {
+                            final updatedSubtasks = List<Subtask>.from(subtasks)..removeAt(index);
+                            await FirebaseFirestore.instance
+                                .collection('todos')
+                                .doc(widget.todo.id)
+                                .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+                          },
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
-        ...widget.todo.subtasks.asMap().entries.map((entry) {
-          final int index = entry.key;
-          final subtask = entry.value;
-          final completedAt = subtask.completedAt;
-          return CheckboxListTile(
-            value: completedAt != null,
-            onChanged: (bool? value) async {
-              final List<Subtask> updatedSubtasks = List.from(widget.todo.subtasks);
-              updatedSubtasks[index] = Subtask(
-                text: subtask.text,
-                completedAt: value == true ? DateTime.now() : null,
-              );
-              await FirebaseFirestore.instance
-                  .collection('todos')
-                  .doc(widget.todo.id)
-                  .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
-            },
-            title: Text(
-              subtask.text,
-              style: completedAt != null
-                  ? const TextStyle(decoration: TextDecoration.lineThrough)
-                  : null,
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddSubtaskDialog(List<Subtask> currentSubtasks) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        final TextEditingController controller = TextEditingController();
+        
+        return Dialog(
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Add Subtask',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: 'Subtask',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () async {
+                        if (controller.text.isNotEmpty) {
+                          final updatedSubtasks = List<Subtask>.from(currentSubtasks)
+                            ..add(Subtask(text: controller.text.trim(), completedAt: null));
+                          
+                          await FirebaseFirestore.instance
+                              .collection('todos')
+                              .doc(widget.todo.id)
+                              .update({'subtasks': updatedSubtasks.map((s) => s.toSnapshot()).toList()});
+                        }
+                        Navigator.of(dialogContext).pop();
+                      },
+                      child: const Text('Add'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          );
-        }).toList(),
-      ],
+          ),
+        );
+      },
     );
   }
 

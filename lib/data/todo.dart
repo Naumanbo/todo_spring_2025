@@ -72,22 +72,19 @@ class Subtask {
   final String text;
   final DateTime? completedAt;
 
-  Subtask({
-    required this.text,
-    required this.completedAt,
-  });
-
-  Map<String, dynamic> toSnapshot() {
-    return {
-      'text': text,
-      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
-    };
-  }
+  Subtask({required this.text, this.completedAt});
 
   factory Subtask.fromSnapshot(Map<String, dynamic> data) {
     return Subtask(
       text: data['text'],
       completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
     );
+  }
+
+  Map<String, dynamic> toSnapshot() {
+    return {
+      'text': text,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+    };
   }
 }
