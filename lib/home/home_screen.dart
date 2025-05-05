@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedLocationName;
   List<String> _categories = ['None', 'Home', 'Work', 'School'];
   final List<TextEditingController> _subtaskControllers = [];
+  final List<bool> _subtaskCompletionStatus = [];
   final _scrollController = ScrollController();
   StreamSubscription<QuerySnapshot>? _categoriesSubscription;
 
@@ -117,16 +118,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     
-    // Show loading indicator
     setState(() {
       _isAddingTask = false;
     });
 
     try {
-      List<Map<String, dynamic>> subtasks = _subtaskControllers
-          .map((controller) => {
-                'text': controller.text.trim(),
-                'completedAt': null,
+      List<Map<String, dynamic>> subtasks = _subtaskControllers.asMap().entries
+          .map((entry) => {
+                'text': entry.value.text.trim(),
+                'completedAt': _subtaskCompletionStatus[entry.key] ? DateTime.now() : null,
               })
           .where((subtask) => (subtask['text'] as String).isNotEmpty)
           .toList();
@@ -183,6 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
         controller.dispose();
       }
       _subtaskControllers.clear();
+      _subtaskCompletionStatus.clear();
     });
   }
 
@@ -190,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_subtaskControllers.length < 10) {
       setState(() {
         _subtaskControllers.add(TextEditingController());
+        _subtaskCompletionStatus.add(false);
       });
     }
   }
@@ -198,6 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _subtaskControllers[index].dispose();
       _subtaskControllers.removeAt(index);
+      _subtaskCompletionStatus.removeAt(index);
     });
   }
 
@@ -359,6 +362,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                           isDense: true,
                                         ),
                                       ),
+                                    ),
+                                    Checkbox(
+                                      value: _subtaskCompletionStatus[idx],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _subtaskCompletionStatus[idx] = value!;
+                                        });
+                                      },
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.remove_circle_outline),
